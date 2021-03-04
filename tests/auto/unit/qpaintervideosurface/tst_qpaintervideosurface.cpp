@@ -220,8 +220,8 @@ void tst_QPainterVideoSurface::supportedFormat_data()
             << m_libGL
             << m_libGL;
 #else
-            << false
-            << false;
+            << true
+            << true;
 #endif
     QTest::newRow("rgb24 -1024x-768")
             << QAbstractVideoBuffer::NoHandle
@@ -230,7 +230,7 @@ void tst_QPainterVideoSurface::supportedFormat_data()
 #if QT_CONFIG(opengl) && !defined(QT_OPENGL_ES)
             << m_libGL
 #else
-            << false
+            << true
 #endif
             << false;
     QTest::newRow("rgb565 0x0")

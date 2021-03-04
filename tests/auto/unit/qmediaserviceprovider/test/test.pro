@@ -5,7 +5,7 @@ QT += multimedia-private testlib
 
 SOURCES += ../tst_qmediaserviceprovider.cpp
 
-win32 {
+win32|os2 {
     CONFIG(debug, debug|release) {
         TARGET = ../../debug/tst_qmediaserviceprovider
     } else {
