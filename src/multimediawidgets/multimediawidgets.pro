@@ -1,5 +1,6 @@
 # distinct from Qt Multimedia
 TARGET = QtMultimediaWidgets
+TARGET_SHORT = QtMMW
 QT = core gui multimedia-private widgets-private
 qtHaveModule(opengl): \
    QT_PRIVATE += opengl

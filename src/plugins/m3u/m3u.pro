@@ -1,4 +1,5 @@
 TARGET = qtmultimedia_m3u
+TARGET_SHORT = qtmmm3u
 QT += multimedia-private
 
 HEADERS += qm3uhandler.h

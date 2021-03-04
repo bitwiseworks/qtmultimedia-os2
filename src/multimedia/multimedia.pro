@@ -1,4 +1,6 @@
 TARGET = QtMultimedia
+TARGET_SHORT = QtMM
+
 QT = core-private network gui-private
 
 MODULE_PLUGIN_TYPES = \
