@@ -75,7 +75,9 @@ private slots:
     void shaderPresentGLFrame();
 #endif
 private:
+#if QT_CONFIG(opengl) && !defined(QT_OPENGL_ES)
     bool m_libGL = QOpenGLContext::openGLModuleType() == QOpenGLContext::LibGL;
+#endif
 };
 
 Q_DECLARE_METATYPE(const uchar *)
@@ -214,7 +216,7 @@ void tst_QPainterVideoSurface::supportedFormat_data()
             << QAbstractVideoBuffer::NoHandle
             << QVideoFrame::Format_RGB24
             << QSize(1024, 768)
-#if !defined(QT_OPENGL_ES)
+#if QT_CONFIG(opengl) && !defined(QT_OPENGL_ES)
             << m_libGL
             << m_libGL;
 #else
@@ -225,7 +227,7 @@ void tst_QPainterVideoSurface::supportedFormat_data()
             << QAbstractVideoBuffer::NoHandle
             << QVideoFrame::Format_RGB24
             << QSize(-1024, -768)
-#if !defined(QT_OPENGL_ES)
+#if QT_CONFIG(opengl) && !defined(QT_OPENGL_ES)
             << m_libGL
 #else
             << false
@@ -376,7 +378,7 @@ void tst_QPainterVideoSurface::present_data()
             << int(sizeof(argb32ImageData))
             << 8;
 
-#if !defined(QT_OPENGL_ES)
+#if QT_CONFIG(opengl) && !defined(QT_OPENGL_ES)
     if (m_libGL)
         QTest::newRow("rgb32 -> rgb24")
                 << QVideoFrame::Format_RGB32
@@ -403,7 +405,7 @@ void tst_QPainterVideoSurface::present_data()
             << int(sizeof(rgb565ImageData))
             << 4;
 
-#if !defined(QT_OPENGL_ES)
+#if QT_CONFIG(opengl) && !defined(QT_OPENGL_ES)
     if (m_libGL)
         QTest::newRow("rgb24 -> rgb565")
                 << QVideoFrame::Format_RGB24
@@ -584,7 +586,7 @@ void tst_QPainterVideoSurface::shaderType()
         QCOMPARE(spy.count(), 0);
     }
 
-#if !defined(QT_OPENGL_ES)
+#if QT_CONFIG(opengl) && !defined(QT_OPENGL_ES)
     if (surface.supportedShaderTypes() & QPainterVideoSurface::FragmentProgramShader) {
         QSignalSpy spy(&surface, SIGNAL(supportedFormatsChanged()));
 
@@ -629,7 +631,7 @@ void tst_QPainterVideoSurface::shaderType()
         QCOMPARE(surface.shaderType(), QPainterVideoSurface::NoShaders);
         QCOMPARE(spy.count(), 0);
 
-#if !defined(QT_OPENGL_ES)
+#if QT_CONFIG(opengl) && !defined(QT_OPENGL_ES)
         surface.setShaderType(QPainterVideoSurface::FragmentProgramShader);
         QCOMPARE(surface.shaderType(), QPainterVideoSurface::NoShaders);
         QCOMPARE(spy.count(), 0);
@@ -645,7 +647,7 @@ void tst_QPainterVideoSurface::shaderTypeStarted_data()
 {
     QTest::addColumn<QPainterVideoSurface::ShaderType>("shaderType");
 
-#if !defined(QT_OPENGL_ES)
+#if QT_CONFIG(opengl) && !defined(QT_OPENGL_ES)
     QTest::newRow("ARBfp")
             << QPainterVideoSurface::FragmentProgramShader;
 #endif
@@ -733,7 +735,7 @@ void tst_QPainterVideoSurface::shaderSupportedFormat_data()
     QList<QPair<QPainterVideoSurface::ShaderType, QByteArray> > types;
 
 
-#if !defined(QT_OPENGL_ES)
+#if QT_CONFIG(opengl) && !defined(QT_OPENGL_ES)
     types << qMakePair(QPainterVideoSurface::FragmentProgramShader, QByteArray("ARBfp: "));
 #endif
     types << qMakePair(QPainterVideoSurface::GlslShader, QByteArray("GLSL: "));
@@ -780,7 +782,7 @@ void tst_QPainterVideoSurface::shaderSupportedFormat_data()
                 << QAbstractVideoBuffer::NoHandle
                 << QVideoFrame::Format_RGB24
                 << QSize(1024, 768)
-#if !defined(QT_OPENGL_ES)
+#if QT_CONFIG(opengl) && !defined(QT_OPENGL_ES)
                 << m_libGL
                 << m_libGL;
 #else
@@ -792,7 +794,7 @@ void tst_QPainterVideoSurface::shaderSupportedFormat_data()
                 << QAbstractVideoBuffer::NoHandle
                 << QVideoFrame::Format_RGB24
                 << QSize(-1024, -768)
-#if !defined(QT_OPENGL_ES)
+#if QT_CONFIG(opengl) && !defined(QT_OPENGL_ES)
                 << m_libGL
 #else
                 << false
@@ -953,7 +955,7 @@ void tst_QPainterVideoSurface::shaderPresent_data()
     QTest::addColumn<int>("bytesPerLineB");
 
     QList<QPair<QPainterVideoSurface::ShaderType, QByteArray> > types;
-#if !defined(QT_OPENGL_ES)
+#if QT_CONFIG(opengl) && !defined(QT_OPENGL_ES)
     types << qMakePair(QPainterVideoSurface::FragmentProgramShader, QByteArray("ARBfp: "));
 #endif
     types << qMakePair(QPainterVideoSurface::GlslShader, QByteArray("GLSL: "));
@@ -1153,7 +1155,7 @@ void tst_QPainterVideoSurface::shaderPresentOpaqueFrame_data()
 {
     QTest::addColumn<QPainterVideoSurface::ShaderType>("shaderType");
 
-#if !defined(QT_OPENGL_ES)
+#if QT_CONFIG(opengl) && !defined(QT_OPENGL_ES)
     QTest::newRow("ARBfp")
             << QPainterVideoSurface::FragmentProgramShader;
 #endif
@@ -1207,7 +1209,7 @@ void tst_QPainterVideoSurface::shaderPresentGLFrame_data()
 {
     QTest::addColumn<QPainterVideoSurface::ShaderType>("shaderType");
 
-#if !defined(QT_OPENGL_ES)
+#if QT_CONFIG(opengl) && !defined(QT_OPENGL_ES)
     QTest::newRow("ARBfp")
             << QPainterVideoSurface::FragmentProgramShader;
 #endif
