@@ -46,6 +46,7 @@ QT_BEGIN_NAMESPACE
 
 /*!
     \class QRadioDataControl
+    \obsolete
     \inmodule QtMultimedia
 
 
@@ -187,6 +188,6 @@ QRadioDataControl::~QRadioDataControl()
     Signals that the Radio Text \a radioText has changed
 */
 
-#include "moc_qradiodatacontrol.cpp"
 QT_END_NAMESPACE
 
+#include "moc_qradiodatacontrol.cpp"

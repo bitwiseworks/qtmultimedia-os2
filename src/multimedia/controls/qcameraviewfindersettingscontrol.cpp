@@ -44,6 +44,7 @@ QT_BEGIN_NAMESPACE
 
 /*!
     \class QCameraViewfinderSettingsControl
+    \obsolete
     \inmodule QtMultimedia
 
 
@@ -200,6 +201,6 @@ QCameraViewfinderSettingsControl2::~QCameraViewfinderSettingsControl2()
     Sets the camera viewfinder \a settings.
 */
 
-#include "moc_qcameraviewfindersettingscontrol.cpp"
 QT_END_NAMESPACE
 
+#include "moc_qcameraviewfindersettingscontrol.cpp"

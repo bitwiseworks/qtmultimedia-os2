@@ -44,6 +44,7 @@ QT_BEGIN_NAMESPACE
 
 /*!
     \class QMediaVideoProbeControl
+    \obsolete
     \inmodule QtMultimedia
 
 
@@ -96,6 +97,6 @@ QMediaVideoProbeControl::~QMediaVideoProbeControl()
     This signal should be emitted when it is required to release all frames.
 */
 
-#include "moc_qmediavideoprobecontrol.cpp"
-
 QT_END_NAMESPACE
+
+#include "moc_qmediavideoprobecontrol.cpp"

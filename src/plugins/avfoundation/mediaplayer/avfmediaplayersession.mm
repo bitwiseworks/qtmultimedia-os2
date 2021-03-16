@@ -42,6 +42,7 @@
 #include "avfvideooutput.h"
 
 #include <qpointer.h>
+#include <QFileInfo>
 
 #import <AVFoundation/AVFoundation.h>
 
@@ -66,7 +67,7 @@ static void *AVFMediaPlayerSessionObserverBufferLikelyToKeepUpContext = &AVFMedi
 static void *AVFMediaPlayerSessionObserverCurrentItemObservationContext = &AVFMediaPlayerSessionObserverCurrentItemObservationContext;
 static void *AVFMediaPlayerSessionObserverCurrentItemDurationObservationContext = &AVFMediaPlayerSessionObserverCurrentItemDurationObservationContext;
 
-@interface AVFMediaPlayerSessionObserver : NSObject
+@interface AVFMediaPlayerSessionObserver : NSObject<AVAssetResourceLoaderDelegate>
 
 @property (readonly, getter=player) AVPlayer* m_player;
 @property (readonly, getter=playerItem) AVPlayerItem* m_playerItem;
@@ -74,7 +75,7 @@ static void *AVFMediaPlayerSessionObserverCurrentItemDurationObservationContext 
 @property (readonly, getter=session) AVFMediaPlayerSession* m_session;
 
 - (AVFMediaPlayerSessionObserver *) initWithMediaPlayerSession:(AVFMediaPlayerSession *)session;
-- (void) setURL:(NSURL *)url;
+- (void) setURL:(NSURL *)url mimeType:(NSString *)mimeType;
 - (void) unloadMedia;
 - (void) prepareToPlayAsset:(AVURLAsset *)asset withKeys:(NSArray *)requestedKeys;
 - (void) assetFailedToPrepareForPlayback:(NSError *)error;
@@ -84,6 +85,7 @@ static void *AVFMediaPlayerSessionObserverCurrentItemDurationObservationContext 
                          change:(NSDictionary *)change context:(void *)context;
 - (void) detatchSession;
 - (void) dealloc;
+- (BOOL) resourceLoader:(AVAssetResourceLoader *)resourceLoader shouldWaitForLoadingOfRequestedResource:(AVAssetResourceLoadingRequest *)loadingRequest;
 @end
 
 @implementation AVFMediaPlayerSessionObserver
@@ -95,6 +97,8 @@ static void *AVFMediaPlayerSessionObserverCurrentItemDurationObservationContext 
     AVPlayerLayer *m_playerLayer;
     NSURL *m_URL;
     BOOL m_bufferIsLikelyToKeepUp;
+    NSData *m_data;
+    NSString *m_mimeType;
 }
 
 @synthesize m_player, m_playerItem, m_playerLayer, m_session;
@@ -109,8 +113,11 @@ static void *AVFMediaPlayerSessionObserverCurrentItemDurationObservationContext 
     return self;
 }
 
-- (void) setURL:(NSURL *)url
+- (void) setURL:(NSURL *)url mimeType:(NSString *)mimeType
 {
+    [m_mimeType release];
+    m_mimeType = [mimeType retain];
+
     if (m_URL != url)
     {
         [m_URL release];
@@ -122,6 +129,8 @@ static void *AVFMediaPlayerSessionObserverCurrentItemDurationObservationContext 
         // use __block to avoid maintaining strong references on variables captured by the
         // following block callback
         __block AVURLAsset *asset = [[AVURLAsset URLAssetWithURL:m_URL options:nil] retain];
+        [asset.resourceLoader setDelegate:self queue:dispatch_get_main_queue()];
+
         __block NSArray *requestedKeys = [[NSArray arrayWithObjects:AVF_TRACKS_KEY, AVF_PLAYABLE_KEY, nil] retain];
 
         __block AVFMediaPlayerSessionObserver *blockSelf = self;
@@ -403,9 +412,48 @@ static void *AVFMediaPlayerSessionObserverCurrentItemDurationObservationContext 
         [m_URL release];
     }
 
+    [m_mimeType release];
     [super dealloc];
 }
 
+- (BOOL) resourceLoader:(AVAssetResourceLoader *)resourceLoader shouldWaitForLoadingOfRequestedResource:(AVAssetResourceLoadingRequest *)loadingRequest
+{
+    Q_UNUSED(resourceLoader);
+
+    if (![loadingRequest.request.URL.scheme isEqualToString:@"iodevice"])
+        return NO;
+
+    QIODevice *device = m_session->mediaStream();
+    if (!device)
+        return NO;
+
+    device->seek(loadingRequest.dataRequest.requestedOffset);
+    if (loadingRequest.contentInformationRequest) {
+        loadingRequest.contentInformationRequest.contentType = m_mimeType;
+        loadingRequest.contentInformationRequest.contentLength = device->size();
+        loadingRequest.contentInformationRequest.byteRangeAccessSupported = YES;
+    }
+
+    if (loadingRequest.dataRequest) {
+        NSInteger requestedLength = loadingRequest.dataRequest.requestedLength;
+        int maxBytes = qMin(32 * 1064, int(requestedLength));
+        char buffer[maxBytes];
+        NSInteger submitted = 0;
+        while (submitted < requestedLength) {
+            qint64 len = device->read(buffer, maxBytes);
+            if (len < 1)
+                break;
+
+            [loadingRequest.dataRequest respondWithData:[NSData dataWithBytes:buffer length:len]];
+            submitted += len;
+        }
+
+        // Finish loading even if not all bytes submitted.
+        [loadingRequest finishLoading];
+    }
+
+    return YES;
+}
 @end
 
 AVFMediaPlayerSession::AVFMediaPlayerSession(AVFMediaPlayerService *service, QObject *parent)
@@ -483,21 +531,33 @@ QMediaContent AVFMediaPlayerSession::media() const
     return m_resources;
 }
 
-const QIODevice *AVFMediaPlayerSession::mediaStream() const
+QIODevice *AVFMediaPlayerSession::mediaStream() const
 {
     return m_mediaStream;
+}
+
+static void setURL(void *observer, const QByteArray &url, const QString &mimeType = QString())
+{
+    NSString *urlString = [NSString stringWithUTF8String:url.constData()];
+    NSURL *nsurl = [NSURL URLWithString:urlString];
+    [static_cast<AVFMediaPlayerSessionObserver*>(observer) setURL:nsurl mimeType:[NSString stringWithUTF8String:mimeType.toLatin1().constData()]];
+}
+
+static void setStreamURL(void *observer, const QByteArray &url)
+{
+    setURL(observer, QByteArrayLiteral("iodevice://") + url, QFileInfo(url).suffix());
 }
 
 void AVFMediaPlayerSession::setMedia(const QMediaContent &content, QIODevice *stream)
 {
 #ifdef QT_DEBUG_AVF
-    qDebug() << Q_FUNC_INFO << content.canonicalUrl();
+    qDebug() << Q_FUNC_INFO << content.request().url();
 #endif
 
     [static_cast<AVFMediaPlayerSessionObserver*>(m_observer) unloadMedia];
 
     m_resources = content;
-    m_mediaStream = stream;
+    resetStream(stream);
 
     setAudioAvailable(false);
     setVideoAvailable(false);
@@ -508,7 +568,7 @@ void AVFMediaPlayerSession::setMedia(const QMediaContent &content, QIODevice *st
     const QMediaPlayer::MediaStatus oldMediaStatus = m_mediaStatus;
     const QMediaPlayer::State oldState = m_state;
 
-    if (content.isNull() || content.canonicalUrl().isEmpty()) {
+    if (!m_mediaStream && (content.isNull() || content.request().url().isEmpty())) {
         m_mediaStatus = QMediaPlayer::NoMedia;
         if (m_mediaStatus != oldMediaStatus)
             Q_EMIT mediaStatusChanged(m_mediaStatus);
@@ -524,11 +584,16 @@ void AVFMediaPlayerSession::setMedia(const QMediaContent &content, QIODevice *st
     if (m_mediaStatus != oldMediaStatus)
         Q_EMIT mediaStatusChanged(m_mediaStatus);
 
-    //Load AVURLAsset
-    //initialize asset using content's URL
-    NSString *urlString = [NSString stringWithUTF8String:content.canonicalUrl().toEncoded().constData()];
-    NSURL *url = [NSURL URLWithString:urlString];
-    [static_cast<AVFMediaPlayerSessionObserver*>(m_observer) setURL:url];
+    if (m_mediaStream) {
+        // If there is a data, try to load it,
+        // otherwise wait for readyRead.
+        if (m_mediaStream->size())
+            setStreamURL(m_observer, m_resources.request().url().toEncoded());
+    } else {
+        //Load AVURLAsset
+        //initialize asset using content's URL
+        setURL(m_observer, m_resources.request().url().toEncoded());
+    }
 
     m_state = QMediaPlayer::StoppedState;
     if (m_state != oldState)
@@ -686,7 +751,7 @@ void AVFMediaPlayerSession::setPosition(qint64 pos)
 
     CMTime newTime = [playerItem currentTime];
     newTime.value = (pos / 1000.0f) * newTime.timescale;
-    [playerItem seekToTime:newTime];
+    [playerItem seekToTime:newTime toleranceBefore:kCMTimeZero toleranceAfter:kCMTimeZero completionHandler:nil];
 
     Q_EMIT positionChanged(pos);
 
@@ -825,8 +890,6 @@ void AVFMediaPlayerSession::processEOS()
 #endif
     Q_EMIT positionChanged(position());
     m_mediaStatus = QMediaPlayer::EndOfMedia;
-    Q_EMIT mediaStatusChanged(m_mediaStatus);
-
     m_state = QMediaPlayer::StoppedState;
 
     // At this point, frames should not be rendered anymore.
@@ -834,6 +897,7 @@ void AVFMediaPlayerSession::processEOS()
     if (m_videoOutput)
         m_videoOutput->setLayer(nullptr);
 
+    Q_EMIT mediaStatusChanged(m_mediaStatus);
     Q_EMIT stateChanged(m_state);
 }
 
@@ -876,9 +940,11 @@ void AVFMediaPlayerSession::processLoadStateChange(QMediaPlayer::State newState)
             // Get the native size of the video, and reset the bounds of the player layer
             AVPlayerLayer *playerLayer = [static_cast<AVFMediaPlayerSessionObserver*>(m_observer) playerLayer];
             if (videoTrack && playerLayer) {
-                playerLayer.bounds = CGRectMake(0.0f, 0.0f,
-                                                videoTrack.naturalSize.width,
-                                                videoTrack.naturalSize.height);
+                if (!playerLayer.bounds.size.width || !playerLayer.bounds.size.height) {
+                    playerLayer.bounds = CGRectMake(0.0f, 0.0f,
+                                                    videoTrack.naturalSize.width,
+                                                    videoTrack.naturalSize.height);
+                }
 
                 if (m_videoOutput && newState != QMediaPlayer::StoppedState) {
                     m_videoOutput->setLayer(playerLayer);
@@ -922,6 +988,20 @@ void AVFMediaPlayerSession::processBufferStateChange(int bufferStatus)
     if (bufferStatus == m_bufferStatus)
         return;
 
+    auto status = m_mediaStatus;
+    // Buffered -> unbuffered.
+    if (!bufferStatus) {
+        status = QMediaPlayer::StalledMedia;
+    } else if (status == QMediaPlayer::StalledMedia) {
+        status = QMediaPlayer::BufferedMedia;
+        // Resume playback.
+        if (m_state == QMediaPlayer::PlayingState)
+            [[static_cast<AVFMediaPlayerSessionObserver*>(m_observer) player] setRate:m_rate];
+    }
+
+    if (m_mediaStatus != status)
+        Q_EMIT mediaStatusChanged(m_mediaStatus = status);
+
     m_bufferStatus = bufferStatus;
     Q_EMIT bufferStatusChanged(bufferStatus);
 }
@@ -953,4 +1033,29 @@ void AVFMediaPlayerSession::processMediaLoadError()
     Q_EMIT mediaStatusChanged((m_mediaStatus = QMediaPlayer::InvalidMedia));
 
     Q_EMIT error(QMediaPlayer::FormatError, tr("Failed to load media"));
+}
+
+void AVFMediaPlayerSession::streamReady()
+{
+    setStreamURL(m_observer, m_resources.request().url().toEncoded());
+}
+
+void AVFMediaPlayerSession::streamDestroyed()
+{
+    resetStream(nullptr);
+}
+
+void AVFMediaPlayerSession::resetStream(QIODevice *stream)
+{
+    if (m_mediaStream) {
+        disconnect(m_mediaStream, &QIODevice::readyRead, this, &AVFMediaPlayerSession::streamReady);
+        disconnect(m_mediaStream, &QIODevice::destroyed, this, &AVFMediaPlayerSession::streamDestroyed);
+    }
+
+    m_mediaStream = stream;
+
+    if (m_mediaStream) {
+        connect(m_mediaStream, &QIODevice::readyRead, this, &AVFMediaPlayerSession::streamReady);
+        connect(m_mediaStream, &QIODevice::destroyed, this, &AVFMediaPlayerSession::streamDestroyed);
+    }
 }

@@ -44,6 +44,7 @@ QT_BEGIN_NAMESPACE
 
 /*!
     \class QCameraFocusControl
+    \obsolete
 
 
     \brief The QCameraFocusControl class supplies control for
@@ -192,6 +193,6 @@ QCameraFocusControl::~QCameraFocusControl()
 
 
 
-#include "moc_qcamerafocuscontrol.cpp"
 QT_END_NAMESPACE
 
+#include "moc_qcamerafocuscontrol.cpp"

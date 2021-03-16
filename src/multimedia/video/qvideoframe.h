@@ -75,7 +75,6 @@ public:
         Format_ARGB8565_Premultiplied,
         Format_BGRA32,
         Format_BGRA32_Premultiplied,
-        Format_ABGR32,
         Format_BGR32,
         Format_BGR24,
         Format_BGR565,
@@ -102,6 +101,8 @@ public:
 
         Format_CameraRaw,
         Format_AdobeDng,
+        Format_ABGR32, // ### Qt 6: reorder
+        Format_YUV422P,
 
 #ifndef Q_QDOC
         NPixelFormats,
@@ -164,6 +165,8 @@ public:
     QVariantMap availableMetaData() const;
     QVariant metaData(const QString &key) const;
     void setMetaData(const QString &key, const QVariant &value);
+
+    QImage image() const;
 
     static PixelFormat pixelFormatFromImageFormat(QImage::Format format);
     static QImage::Format imageFormatFromPixelFormat(PixelFormat format);

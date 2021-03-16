@@ -43,13 +43,7 @@
 QT_BEGIN_NAMESPACE
 
 QGstreamerBufferProbe::QGstreamerBufferProbe(Flags flags)
-#if GST_CHECK_VERSION(1,0,0)
-    : m_capsProbeId(-1)
-#else
-    : m_caps(0)
-#endif
-    , m_bufferProbeId(-1)
-    , m_flags(flags)
+    : m_flags(flags)
 {
 }
 
@@ -76,11 +70,11 @@ void QGstreamerBufferProbe::addProbeToPad(GstPad *pad, bool downstream)
                         : GST_PAD_PROBE_TYPE_EVENT_UPSTREAM,
                     capsProbe,
                     this,
-                    NULL);
+                    nullptr);
     }
     if (m_flags & ProbeBuffers) {
         m_bufferProbeId = gst_pad_add_probe(
-                    pad, GST_PAD_PROBE_TYPE_BUFFER, bufferProbe, this, NULL);
+                    pad, GST_PAD_PROBE_TYPE_BUFFER, bufferProbe, this, nullptr);
     }
 #else
     Q_UNUSED(downstream);

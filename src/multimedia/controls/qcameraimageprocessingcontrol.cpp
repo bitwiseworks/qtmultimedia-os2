@@ -51,6 +51,7 @@ Q_CONSTRUCTOR_FUNCTION(qRegisterCameraImageProcessingControlMetaTypes)
 
 /*!
     \class QCameraImageProcessingControl
+    \obsolete
     \inmodule QtMultimedia
 
 
@@ -183,6 +184,6 @@ QCameraImageProcessingControl::~QCameraImageProcessingControl()
     The base value for platform specific extended parameters.
  */
 
-#include "moc_qcameraimageprocessingcontrol.cpp"
 QT_END_NAMESPACE
 
+#include "moc_qcameraimageprocessingcontrol.cpp"

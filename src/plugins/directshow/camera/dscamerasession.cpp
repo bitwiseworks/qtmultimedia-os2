@@ -44,7 +44,6 @@
 #include <QtMultimedia/qvideosurfaceformat.h>
 #include <QtMultimedia/qcameraimagecapture.h>
 #include <private/qmemoryvideobuffer_p.h>
-#include <private/qvideoframe_p.h>
 
 #include "dscamerasession.h"
 #include "dsvideorenderer.h"
@@ -58,23 +57,6 @@ QT_BEGIN_NAMESPACE
 
 DSCameraSession::DSCameraSession(QObject *parent)
     : QObject(parent)
-    , m_graphBuilder(nullptr)
-    , m_filterGraph(nullptr)
-    , m_sourceDeviceName(QLatin1String("default"))
-    , m_sourceFilter(nullptr)
-    , m_needsHorizontalMirroring(false)
-    , m_previewSampleGrabber(nullptr)
-    , m_nullRendererFilter(nullptr)
-    , m_previewStarted(false)
-    , m_surface(nullptr)
-    , m_previewPixelFormat(QVideoFrame::Format_Invalid)
-    , m_stride(-1)
-    , m_readyForCapture(false)
-    , m_imageIdCounter(0)
-    , m_currentImageId(-1)
-    , m_captureDestinations(QCameraImageCapture::CaptureToFile)
-    , m_videoProbeControl(nullptr)
-    , m_status(QCamera::UnloadedStatus)
 {
     connect(this, &DSCameraSession::statusChanged,
             this, &DSCameraSession::updateReadyForCapture);
@@ -284,7 +266,7 @@ void DSCameraSession::setImageProcessingParameter(
             ImageProcessingParameterInfo>::iterator sourceValueInfo =
             m_imageProcessingParametersInfos.find(resultingParameter);
 
-    if (sourceValueInfo == m_imageProcessingParametersInfos.constEnd())
+    if (sourceValueInfo == m_imageProcessingParametersInfos.end())
         return;
 
     LONG sourceValue = 0;
@@ -446,6 +428,7 @@ bool DSCameraSession::unload()
     SAFE_RELEASE(m_nullRendererFilter);
     SAFE_RELEASE(m_filterGraph);
     SAFE_RELEASE(m_graphBuilder);
+    SAFE_RELEASE(m_outputPin);
 
     setStatus(QCamera::UnloadedStatus);
 
@@ -464,7 +447,7 @@ bool DSCameraSession::startPreview()
 
     QString errorString;
     HRESULT hr = S_OK;
-    IMediaControl* pControl = 0;
+    IMediaControl* pControl = nullptr;
 
     if (!configurePreviewFormat()) {
         errorString = tr("Failed to configure preview format");
@@ -516,7 +499,7 @@ bool DSCameraSession::stopPreview()
         m_previewSampleGrabber->stop();
 
     QString errorString;
-    IMediaControl* pControl = 0;
+    IMediaControl* pControl = nullptr;
     HRESULT hr = m_filterGraph->QueryInterface(IID_IMediaControl,
                                                reinterpret_cast<void**>(&pControl));
     if (FAILED(hr)) {
@@ -654,7 +637,7 @@ void DSCameraSession::presentFrame()
 
     if (m_capturedFrame.isValid()) {
 
-        captureImage = qt_imageFromVideoFrame(m_capturedFrame);
+        captureImage = m_capturedFrame.image();
 
         const bool needsVerticalMirroring = m_previewSurfaceFormat.scanLineDirection() != QVideoSurfaceFormat::TopToBottom;
         captureImage = captureImage.mirrored(m_needsHorizontalMirroring, needsVerticalMirroring); // also causes a deep copy of the data
@@ -740,12 +723,12 @@ bool DSCameraSession::createFilterGraph()
         pDevEnum->Release();
         if (S_OK == hr) {
             pEnum->Reset();
-            IMalloc *mallocInterface = 0;
+            IMalloc *mallocInterface = nullptr;
             CoGetMalloc(1, (LPMALLOC*)&mallocInterface);
             //go through and find all video capture devices
             while (pEnum->Next(1, &pMoniker, nullptr) == S_OK) {
 
-                BSTR strName = 0;
+                BSTR strName = nullptr;
                 hr = pMoniker->GetDisplayName(nullptr, nullptr, &strName);
                 if (SUCCEEDED(hr)) {
                     QString output = QString::fromWCharArray(strName);
@@ -769,7 +752,7 @@ bool DSCameraSession::createFilterGraph()
                     pEnum->Reset();
                     // still have to loop to discard bind to storage failure case
                     while (pEnum->Next(1, &pMoniker, nullptr) == S_OK) {
-                        IPropertyBag *pPropBag = 0;
+                        IPropertyBag *pPropBag = nullptr;
 
                         hr = pMoniker->BindToStorage(nullptr, nullptr, IID_IPropertyBag,
                                                      reinterpret_cast<void**>(&pPropBag));
@@ -780,17 +763,13 @@ bool DSCameraSession::createFilterGraph()
 
                         // No need to get the description, just grab it
 
-                        hr = pMoniker->BindToObject(0, 0, IID_IBaseFilter,
+                        hr = pMoniker->BindToObject(nullptr, nullptr, IID_IBaseFilter,
                                                     reinterpret_cast<void**>(&m_sourceFilter));
                         pPropBag->Release();
                         pMoniker->Release();
-                        if (SUCCEEDED(hr)) {
+                        if (SUCCEEDED(hr))
                             break; // done, stop looping through
-                        }
-                        else
-                        {
-                            qWarning() << "Object bind failed";
-                        }
+                        qWarning("Object bind failed");
                     }
                 }
             }
@@ -802,6 +781,9 @@ bool DSCameraSession::createFilterGraph()
         errorString = tr("No capture device found");
         goto failed;
     }
+
+    if (!DirectShowUtils::getPin(m_sourceFilter, PINDIR_OUTPUT, PIN_CATEGORY_CAPTURE, &m_outputPin, &hr))
+        qWarning() << "Failed to get the pin for the video control:" << hr;
 
     // Sample grabber filter
     if (!m_previewSampleGrabber) {
@@ -898,7 +880,7 @@ bool DSCameraSession::configurePreviewFormat()
     m_stride = DirectShowMediaType::bytesPerLine(m_previewSurfaceFormat);
 
     HRESULT hr;
-    IAMStreamConfig* pConfig = 0;
+    IAMStreamConfig* pConfig = nullptr;
     hr = m_graphBuilder->FindInterface(&PIN_CATEGORY_CAPTURE, &MEDIATYPE_Video,
                                        m_sourceFilter, IID_IAMStreamConfig,
                                        reinterpret_cast<void**>(&pConfig));
@@ -1064,37 +1046,31 @@ void DSCameraSession::updateSourceCapabilities()
     AM_MEDIA_TYPE *pmt = nullptr;
     VIDEOINFOHEADER *pvi = nullptr;
     VIDEO_STREAM_CONFIG_CAPS scc;
-    IAMStreamConfig* pConfig = 0;
+    IAMStreamConfig* pConfig = nullptr;
 
     m_supportedViewfinderSettings.clear();
     m_needsHorizontalMirroring = false;
     m_supportedFormats.clear();
     m_imageProcessingParametersInfos.clear();
 
-    IAMVideoControl *pVideoControl = 0;
+    IAMVideoControl *pVideoControl = nullptr;
     hr = m_graphBuilder->FindInterface(&PIN_CATEGORY_CAPTURE, &MEDIATYPE_Video,
                                        m_sourceFilter, IID_IAMVideoControl,
                                        reinterpret_cast<void**>(&pVideoControl));
     if (FAILED(hr)) {
         qWarning() << "Failed to get the video control";
-    } else {
-        IPin *pPin = 0;
-        if (!DirectShowUtils::getPin(m_sourceFilter, PINDIR_OUTPUT, &pPin, &hr)) {
-            qWarning() << "Failed to get the pin for the video control";
-        } else {
-            long supportedModes;
-            hr = pVideoControl->GetCaps(pPin, &supportedModes);
-            if (FAILED(hr)) {
-                qWarning() << "Failed to get the supported modes of the video control";
-            } else if (supportedModes & VideoControlFlag_FlipHorizontal) {
-                long mode;
-                hr = pVideoControl->GetMode(pPin, &mode);
-                if (FAILED(hr))
-                    qWarning() << "Failed to get the mode of the video control";
-                else if (supportedModes & VideoControlFlag_FlipHorizontal)
-                    m_needsHorizontalMirroring = (mode & VideoControlFlag_FlipHorizontal);
-            }
-            pPin->Release();
+    } else if (m_outputPin) {
+        long supportedModes;
+        hr = pVideoControl->GetCaps(m_outputPin, &supportedModes);
+        if (FAILED(hr)) {
+            qWarning() << "Failed to get the supported modes of the video control";
+        } else if (supportedModes & VideoControlFlag_FlipHorizontal) {
+            long mode;
+            hr = pVideoControl->GetMode(m_outputPin, &mode);
+            if (FAILED(hr))
+                qWarning() << "Failed to get the mode of the video control";
+            else if (supportedModes & VideoControlFlag_FlipHorizontal)
+                m_needsHorizontalMirroring = (mode & VideoControlFlag_FlipHorizontal);
         }
         pVideoControl->Release();
     }
@@ -1129,28 +1105,22 @@ void DSCameraSession::updateSourceCapabilities()
 
                 QList<QCamera::FrameRateRange> frameRateRanges;
 
-                if (pVideoControl) {
-                    IPin *pPin = 0;
-                    if (!DirectShowUtils::getPin(m_sourceFilter, PINDIR_OUTPUT, &pPin, &hr)) {
-                        qWarning() << "Failed to get the pin for the video control";
-                    } else {
-                        long listSize = 0;
-                        LONGLONG *frameRates = 0;
-                        SIZE size = { resolution.width(), resolution.height() };
-                        hr = pVideoControl->GetFrameRateList(pPin, iIndex, size, &listSize, &frameRates);
-                        if (hr == S_OK && listSize > 0 && frameRates) {
-                            for (long i = 0; i < listSize; ++i) {
-                                qreal fr = qreal(10000000) / frameRates[i];
-                                frameRateRanges.append(QCamera::FrameRateRange(fr, fr));
-                            }
-
-                            // Make sure higher frame rates come first
-                            std::sort(frameRateRanges.begin(), frameRateRanges.end(), qt_frameRateRangeGreaterThan);
+                if (pVideoControl && m_outputPin) {
+                    long listSize = 0;
+                    LONGLONG *frameRates = nullptr;
+                    SIZE size = { resolution.width(), resolution.height() };
+                    hr = pVideoControl->GetFrameRateList(m_outputPin, iIndex, size, &listSize, &frameRates);
+                    if (hr == S_OK && listSize > 0 && frameRates) {
+                        for (long i = 0; i < listSize; ++i) {
+                            qreal fr = qreal(10000000) / frameRates[i];
+                            frameRateRanges.append(QCamera::FrameRateRange(fr, fr));
                         }
 
-                        CoTaskMemFree(frameRates);
-                        pPin->Release();
+                        // Make sure higher frame rates come first
+                        std::sort(frameRateRanges.begin(), frameRateRanges.end(), qt_frameRateRangeGreaterThan);
                     }
+
+                    CoTaskMemFree(frameRates);
                 }
 
                 if (frameRateRanges.isEmpty()) {
@@ -1168,9 +1138,14 @@ void DSCameraSession::updateSourceCapabilities()
                     m_supportedViewfinderSettings.append(settings);
                     m_supportedFormats.append(DirectShowMediaType(*pmt));
                 }
-
-
+            } else {
+                OLECHAR *guidString = nullptr;
+                StringFromCLSID(pmt->subtype, &guidString);
+                if (guidString)
+                    qWarning() << "Unsupported media type:" << QString::fromWCharArray(guidString);
+                ::CoTaskMemFree(guidString);
             }
+
             DirectShowMediaType::deleteType(pmt);
         }
     }

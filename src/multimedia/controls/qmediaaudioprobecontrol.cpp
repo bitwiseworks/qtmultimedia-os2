@@ -44,6 +44,7 @@ QT_BEGIN_NAMESPACE
 
 /*!
     \class QMediaAudioProbeControl
+    \obsolete
     \inmodule QtMultimedia
 
 
@@ -97,6 +98,6 @@ QMediaAudioProbeControl::~QMediaAudioProbeControl()
     This signal should be emitted when it is required to release all frames.
 */
 
-#include "moc_qmediaaudioprobecontrol.cpp"
-
 QT_END_NAMESPACE
+
+#include "moc_qmediaaudioprobecontrol.cpp"

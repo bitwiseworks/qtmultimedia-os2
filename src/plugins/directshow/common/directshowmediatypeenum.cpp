@@ -44,15 +44,12 @@
 DirectShowMediaTypeEnum::DirectShowMediaTypeEnum(DirectShowPin *pin)
     : m_pin(pin)
     , m_mediaTypes(pin->supportedMediaTypes())
-    , m_index(0)
 {
     m_pin->AddRef();
 }
 
 DirectShowMediaTypeEnum::DirectShowMediaTypeEnum(const QList<DirectShowMediaType> &types)
-    : m_pin(nullptr)
-    , m_mediaTypes(types)
-    , m_index(0)
+    : m_mediaTypes(types)
 {
 }
 

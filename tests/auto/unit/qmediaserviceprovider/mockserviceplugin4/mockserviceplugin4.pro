@@ -12,7 +12,7 @@ PLUGIN_CLASS_NAME = MockServicePlugin4
 load(qt_plugin)
 
 DESTDIR = ../$${PLUGIN_TYPE}
-win32|os2 {
+win32|os2:debug_and_release {
     CONFIG(debug, debug|release) {
         DESTDIR = ../debug/$${PLUGIN_TYPE}
     } else {

@@ -44,6 +44,7 @@ QT_BEGIN_NAMESPACE
 
 /*!
     \class QCustomAudioRoleControl
+    \obsolete
     \inmodule QtMultimedia
     \ingroup multimedia_control
     \since 5.11
@@ -113,5 +114,6 @@ QCustomAudioRoleControl::~QCustomAudioRoleControl()
     Signal emitted when the audio \a role has changed.
  */
 
-#include "moc_qcustomaudiorolecontrol.cpp"
 QT_END_NAMESPACE
+
+#include "moc_qcustomaudiorolecontrol.cpp"

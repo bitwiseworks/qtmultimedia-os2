@@ -39,7 +39,6 @@
 
 #include "qvideoframe.h"
 
-#include "qvideoframe_p.h"
 #include "qimagevideobuffer_p.h"
 #include "qmemoryvideobuffer_p.h"
 #include "qvideoframeconversionhelper_p.h"
@@ -226,6 +225,11 @@ private:
     The frame is stored using an 8-bit per component planar YUV format with the U and V planes
     horizontally and vertically sub-sampled, i.e. the height and width of the U and V planes are
     half that of the Y plane.
+
+    \value Format_YUV422P
+    The frame is stored using an 8-bit per component planar YUV format with the U and V planes
+    horizontally sub-sampled, i.e. the width of the U and V planes are
+    half that of the Y plane, and height of U and V planes is the same as Y.
 
     \value Format_YV12
     The frame is stored using an 8-bit per component planar YVU format with the V and U planes
@@ -638,6 +642,7 @@ bool QVideoFrame::map(QAbstractVideoBuffer::MapMode mode)
         // Single plane or opaque format.
         break;
     case Format_YUV420P:
+    case Format_YUV422P:
     case Format_YV12: {
         // The UV stride is usually half the Y stride and is 32-bit aligned.
         // However it's not always the case, at least on Windows where the
@@ -646,13 +651,14 @@ bool QVideoFrame::map(QAbstractVideoBuffer::MapMode mode)
         // have a correct stride.
         const int height = d->size.height();
         const int yStride = d->bytesPerLine[0];
-        const int uvStride = (d->mappedBytes - (yStride * height)) / height;
+        const int uvHeight = d->pixelFormat == Format_YUV422P ? height : height / 2;
+        const int uvStride = (d->mappedBytes - (yStride * height)) / uvHeight / 2;
 
-        // Three planes, the second and third vertically and horizontally subsampled.
+        // Three planes, the second and third vertically (and horizontally for other than Format_YUV422P formats) subsampled.
         d->planeCount = 3;
         d->bytesPerLine[2] = d->bytesPerLine[1] = uvStride;
         d->data[1] = d->data[0] + (yStride * height);
-        d->data[2] = d->data[1] + (uvStride * height / 2);
+        d->data[2] = d->data[1] + (uvStride * uvHeight);
         break;
     }
     case Format_NV12:
@@ -958,6 +964,8 @@ QVideoFrame::PixelFormat QVideoFrame::pixelFormatFromImageFormat(QImage::Format 
         return Format_RGB555;
     case QImage::Format_RGB888:
         return Format_RGB24;
+    case QImage::Format_Grayscale8:
+        return Format_Y8;
     default:
         return Format_Invalid;
     }
@@ -1001,6 +1009,7 @@ QImage::Format QVideoFrame::imageFormatFromPixelFormat(PixelFormat format)
     case Format_AYUV444_Premultiplied:
     case Format_YUV444:
     case Format_YUV420P:
+    case Format_YUV422P:
     case Format_YV12:
     case Format_UYVY:
     case Format_YUYV:
@@ -1010,12 +1019,13 @@ QImage::Format QVideoFrame::imageFormatFromPixelFormat(PixelFormat format)
     case Format_IMC2:
     case Format_IMC3:
     case Format_IMC4:
-    case Format_Y8:
     case Format_Y16:
     case Format_Jpeg:
     case Format_CameraRaw:
     case Format_AdobeDng:
         return QImage::Format_Invalid;
+    case Format_Y8:
+        return QImage::Format_Grayscale8;
     case Format_User:
     default:
         return QImage::Format_Invalid;
@@ -1048,7 +1058,6 @@ static VideoFrameConvertFunc qConvertFuncs[QVideoFrame::NPixelFormats] = {
     /* Format_ARGB8565_Premultiplied */ nullptr, // Not needed
     /* Format_BGRA32 */                 qt_convert_BGRA32_to_ARGB32,
     /* Format_BGRA32_Premultiplied */   qt_convert_BGRA32_to_ARGB32,
-    /* Format_ABGR32 */                 nullptr,
     /* Format_BGR32 */                  qt_convert_BGRA32_to_ARGB32,
     /* Format_BGR24 */                  qt_convert_BGR24_to_ARGB32,
     /* Format_BGR565 */                 qt_convert_BGR565_to_ARGB32,
@@ -1071,7 +1080,9 @@ static VideoFrameConvertFunc qConvertFuncs[QVideoFrame::NPixelFormats] = {
     /* Format_Y16 */                    nullptr,
     /* Format_Jpeg */                   nullptr, // Not needed
     /* Format_CameraRaw */              nullptr,
-    /* Format_AdobeDng */               nullptr
+    /* Format_AdobeDng */               nullptr,
+    /* Format_ABGR32 */                 nullptr, // ### Qt 6: reorder
+    /* Format_YUV422P */                nullptr,
 };
 
 static void qInitConvertFuncsAsm()
@@ -1103,11 +1114,12 @@ static void qInitConvertFuncsAsm()
 }
 
 /*!
-    \internal
+    Based on the pixel format converts current video frame to image.
+    \since 5.15
 */
-QImage qt_imageFromVideoFrame(const QVideoFrame &f)
+QImage QVideoFrame::image() const
 {
-    QVideoFrame &frame = const_cast<QVideoFrame&>(f);
+    QVideoFrame frame = *this;
     QImage result;
 
     if (!frame.isValid() || !frame.map(QAbstractVideoBuffer::ReadOnly))
@@ -1191,6 +1203,8 @@ QDebug operator<<(QDebug dbg, QVideoFrame::PixelFormat pf)
             return dbg << "Format_YUV444";
         case QVideoFrame::Format_YUV420P:
             return dbg << "Format_YUV420P";
+        case QVideoFrame::Format_YUV422P:
+            return dbg << "Format_YUV422P";
         case QVideoFrame::Format_YV12:
             return dbg << "Format_YV12";
         case QVideoFrame::Format_UYVY:

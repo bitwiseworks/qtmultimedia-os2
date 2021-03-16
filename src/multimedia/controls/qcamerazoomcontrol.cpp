@@ -44,6 +44,7 @@ QT_BEGIN_NAMESPACE
 
 /*!
     \class QCameraZoomControl
+    \obsolete
 
 
     \brief The QCameraZoomControl class supplies control for
@@ -182,6 +183,6 @@ QCameraZoomControl::~QCameraZoomControl()
     like capture mode or resolution.
 */
 
-#include "moc_qcamerazoomcontrol.cpp"
 QT_END_NAMESPACE
 
+#include "moc_qcamerazoomcontrol.cpp"

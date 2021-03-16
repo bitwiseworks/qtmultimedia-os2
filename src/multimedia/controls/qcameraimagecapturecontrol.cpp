@@ -44,6 +44,7 @@ QT_BEGIN_NAMESPACE
 
 /*!
     \class QCameraImageCaptureControl
+    \obsolete
 
     \brief The QCameraImageCaptureControl class provides a control interface
     for image capture services.
@@ -189,6 +190,6 @@ QCameraImageCaptureControl::~QCameraImageCaptureControl()
 */
 
 
-#include "moc_qcameraimagecapturecontrol.cpp"
 QT_END_NAMESPACE
 
+#include "moc_qcameraimagecapturecontrol.cpp"

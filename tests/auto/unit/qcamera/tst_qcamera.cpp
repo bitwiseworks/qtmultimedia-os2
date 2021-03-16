@@ -794,16 +794,16 @@ void tst_QCamera::testImageSettings()
     QVERIFY(!settings.isNull());
 
     settings = QImageEncoderSettings();
-    settings.setEncodingOption(QLatin1Literal("encoderOption"), QVariant(1));
-    QCOMPARE(settings.encodingOption(QLatin1Literal("encoderOption")), QVariant(1));
+    settings.setEncodingOption(QLatin1String("encoderOption"), QVariant(1));
+    QCOMPARE(settings.encodingOption(QLatin1String("encoderOption")), QVariant(1));
     QVariantMap options;
-    options.insert(QLatin1Literal("encoderOption"), QVariant(1));
+    options.insert(QLatin1String("encoderOption"), QVariant(1));
     QCOMPARE(settings.encodingOptions(), options);
-    options.insert(QLatin1Literal("encoderOption2"), QVariant(2));
-    options.remove(QLatin1Literal("encoderOption"));
+    options.insert(QLatin1String("encoderOption2"), QVariant(2));
+    options.remove(QLatin1String("encoderOption"));
     settings.setEncodingOptions(options);
-    QCOMPARE(settings.encodingOption(QLatin1Literal("encoderOption")), QVariant());
-    QCOMPARE(settings.encodingOption(QLatin1Literal("encoderOption2")), QVariant(2));
+    QCOMPARE(settings.encodingOption(QLatin1String("encoderOption")), QVariant());
+    QCOMPARE(settings.encodingOption(QLatin1String("encoderOption2")), QVariant(2));
     QVERIFY(!settings.isNull());
     QVERIFY(settings != QImageEncoderSettings());
 
@@ -874,11 +874,11 @@ void tst_QCamera::testImageSettings()
     QVERIFY(settings1 != settings2);
 
     settings1 = QImageEncoderSettings();
-    settings1.setEncodingOption(QLatin1Literal("encoderOption"), QVariant(1));
+    settings1.setEncodingOption(QLatin1String("encoderOption"), QVariant(1));
     settings2 = QImageEncoderSettings();
-    settings2.setEncodingOption(QLatin1Literal("encoderOption"), QVariant(1));
+    settings2.setEncodingOption(QLatin1String("encoderOption"), QVariant(1));
     QVERIFY(settings1 == settings2);
-    settings2.setEncodingOption(QLatin1Literal("encoderOption"), QVariant(2));
+    settings2.setEncodingOption(QLatin1String("encoderOption"), QVariant(2));
     QVERIFY(settings1 != settings2);
 }
 
@@ -2039,7 +2039,7 @@ void tst_QCamera::testErrorSignal()
 
     QCamera camera;
 
-    QSignalSpy spyError(&camera, SIGNAL(error(QCamera::Error)));
+    QSignalSpy spyError(&camera, SIGNAL(errorOccurred(QCamera::Error)));
 
     /* Set the QCameraControl error and verify if the signal is emitted correctly in QCamera */
     service.mockControl->setError(QCamera::CameraError,QString("Camera Error"));

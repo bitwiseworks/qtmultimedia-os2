@@ -331,7 +331,7 @@ bool QnxAudioInput::open()
 
     m_pcmNotifier = new QSocketNotifier(snd_pcm_file_descriptor(m_pcmHandle, SND_PCM_CHANNEL_CAPTURE),
                                         QSocketNotifier::Read, this);
-    connect(m_pcmNotifier, SIGNAL(activated(int)), SLOT(userFeed()));
+    connect(m_pcmNotifier, SIGNAL(activated(QSocketDescriptor)), SLOT(userFeed()));
 
     return true;
 }
@@ -339,7 +339,11 @@ bool QnxAudioInput::open()
 void QnxAudioInput::close()
 {
     if (m_pcmHandle)
+#if SND_PCM_VERSION < SND_PROTOCOL_VERSION('P',3,0,2)
         snd_pcm_plugin_flush(m_pcmHandle, SND_PCM_CHANNEL_CAPTURE);
+#else
+        snd_pcm_plugin_drop(m_pcmHandle, SND_PCM_CHANNEL_CAPTURE);
+#endif
 
     if (m_pcmNotifier) {
         delete m_pcmNotifier;

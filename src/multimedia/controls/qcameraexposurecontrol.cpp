@@ -44,6 +44,7 @@ QT_BEGIN_NAMESPACE
 
 /*!
     \class QCameraExposureControl
+    \obsolete
 
     \brief The QCameraExposureControl class allows controlling camera exposure parameters.
 
@@ -201,7 +202,6 @@ QCameraExposureControl::~QCameraExposureControl()
     \since 5.0
 */
 
-
-#include "moc_qcameraexposurecontrol.cpp"
 QT_END_NAMESPACE
 
+#include "moc_qcameraexposurecontrol.cpp"

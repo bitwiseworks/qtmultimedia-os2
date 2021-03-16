@@ -45,6 +45,7 @@ QT_BEGIN_NAMESPACE
 
 /*!
     \class QVideoEncoderSettingsControl
+    \obsolete
 
     \inmodule QtMultimedia
 
@@ -155,6 +156,6 @@ QVideoEncoderSettingsControl::~QVideoEncoderSettingsControl()
     Sets the selected video encoder \a settings.
 */
 
-#include "moc_qvideoencodersettingscontrol.cpp"
 QT_END_NAMESPACE
 
+#include "moc_qvideoencodersettingscontrol.cpp"

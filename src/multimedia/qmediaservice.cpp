@@ -49,6 +49,7 @@ QT_BEGIN_NAMESPACE
 
 /*!
     \class QMediaService
+    \obsolete
     \brief The QMediaService class provides a common base class for media
     service implementations.
     \ingroup multimedia
@@ -87,20 +88,16 @@ QT_BEGIN_NAMESPACE
 */
 
 QMediaService::QMediaService(QObject *parent)
-    : QObject(parent)
-    , d_ptr(new QMediaServicePrivate)
+    : QObject(*new QMediaServicePrivate, parent)
 {
-    d_ptr->q_ptr = this;
 }
 
 /*!
     \internal
 */
 QMediaService::QMediaService(QMediaServicePrivate &dd, QObject *parent)
-    : QObject(parent)
-    , d_ptr(&dd)
+    : QObject(dd, parent)
 {
-    d_ptr->q_ptr = this;
 }
 
 /*!
@@ -109,7 +106,6 @@ QMediaService::QMediaService(QMediaServicePrivate &dd, QObject *parent)
 
 QMediaService::~QMediaService()
 {
-    delete d_ptr;
 }
 
 /*!
@@ -142,7 +138,6 @@ QMediaService::~QMediaService()
     Releases a \a control back to the service.
 */
 
-#include "moc_qmediaservice.cpp"
-
 QT_END_NAMESPACE
 
+#include "moc_qmediaservice.cpp"

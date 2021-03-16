@@ -1,6 +1,8 @@
 TARGET = imx6vivantevideonode
 
-QT += multimedia-private qtmultimediaquicktools-private
+QT += multimedia-private qtmultimediaquicktools-private multimediagsttools-private
+
+QMAKE_USE += gstreamer
 
 HEADERS += \
     qsgvivantevideonode.h \

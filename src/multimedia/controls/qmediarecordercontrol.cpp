@@ -44,6 +44,7 @@ QT_BEGIN_NAMESPACE
 
 /*!
     \class QMediaRecorderControl
+    \obsolete
     \inmodule QtMultimedia
 
 
@@ -217,6 +218,6 @@ QMediaRecorderControl::~QMediaRecorderControl()
     Signals that an \a error has occurred.  The \a errorString describes the error.
 */
 
-#include "moc_qmediarecordercontrol.cpp"
 QT_END_NAMESPACE
 
+#include "moc_qmediarecordercontrol.cpp"

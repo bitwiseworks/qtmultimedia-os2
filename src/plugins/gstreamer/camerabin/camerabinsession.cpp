@@ -347,10 +347,12 @@ void CameraBinSession::setupCaptureResolution()
     // If capture resolution is specified, use it also for the viewfinder to avoid caps negotiation
     // to fail.
     if (m_usingWrapperCameraBinSrc) {
-        if (m_captureMode == QCamera::CaptureStillImage && !imageResolution.isEmpty())
-            viewfinderResolution = imageResolution;
-        else if (m_captureMode == QCamera::CaptureVideo && !videoResolution.isEmpty())
-            viewfinderResolution = videoResolution;
+        if (viewfinderResolution.isEmpty()) {
+            if (m_captureMode == QCamera::CaptureStillImage && !imageResolution.isEmpty())
+                viewfinderResolution = imageResolution;
+            else if (m_captureMode == QCamera::CaptureVideo && !videoResolution.isEmpty())
+                viewfinderResolution = videoResolution;
+        }
 
         // Make sure we don't use incompatible frame rate and pixel format with the new resolution
         if (viewfinderResolution != m_viewfinderSettings.resolution() &&
@@ -732,7 +734,7 @@ static QList<QCameraViewfinderSettings> capsToViewfinderSettings(GstCaps *suppor
 
 QList<QCameraViewfinderSettings> CameraBinSession::supportedViewfinderSettings() const
 {
-    if (m_status == QCamera::LoadedStatus && m_supportedViewfinderSettings.isEmpty()) {
+    if (m_status >= QCamera::LoadedStatus && m_supportedViewfinderSettings.isEmpty()) {
         m_supportedViewfinderSettings =
             capsToViewfinderSettings(supportedCaps(QCamera::CaptureViewfinder));
     }
@@ -1312,6 +1314,9 @@ QList< QPair<int,int> > CameraBinSession::supportedFrameRates(const QSize &frame
     for (uint i=0; i<gst_caps_get_size(caps); i++) {
         GstStructure *structure = gst_caps_get_structure(caps, i);
         gst_structure_set_name(structure, "video/x-raw");
+#if GST_CHECK_VERSION(1,2,0)
+        gst_caps_set_features(caps, i, NULL);
+#endif
         const GValue *oldRate = gst_structure_get_value(structure, "framerate");
         if (!oldRate)
             continue;
@@ -1322,6 +1327,7 @@ QList< QPair<int,int> > CameraBinSession::supportedFrameRates(const QSize &frame
         g_value_copy(oldRate, &rate);
         gst_structure_remove_all_fields(structure);
         gst_structure_set_value(structure, "framerate", &rate);
+        g_value_unset(&rate);
     }
 #if GST_CHECK_VERSION(1,0,0)
     caps = gst_caps_simplify(caps);
@@ -1424,6 +1430,9 @@ QList<QSize> CameraBinSession::supportedResolutions(QPair<int,int> rate,
     for (uint i=0; i<gst_caps_get_size(caps); i++) {
         GstStructure *structure = gst_caps_get_structure(caps, i);
         gst_structure_set_name(structure, "video/x-raw");
+#if GST_CHECK_VERSION(1,2,0)
+        gst_caps_set_features(caps, i, NULL);
+#endif
         const GValue *oldW = gst_structure_get_value(structure, "width");
         const GValue *oldH = gst_structure_get_value(structure, "height");
         if (!oldW || !oldH)
@@ -1440,6 +1449,8 @@ QList<QSize> CameraBinSession::supportedResolutions(QPair<int,int> rate,
         gst_structure_remove_all_fields(structure);
         gst_structure_set_value(structure, "width", &w);
         gst_structure_set_value(structure, "height", &h);
+        g_value_unset(&w);
+        g_value_unset(&h);
     }
 
 #if GST_CHECK_VERSION(1,0,0)

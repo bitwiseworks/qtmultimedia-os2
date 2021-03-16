@@ -53,7 +53,6 @@
 #include <qdebug.h>
 #include <qvideoframe.h>
 #include <private/qmemoryvideobuffer_p.h>
-#include <private/qvideoframe_p.h>
 #include <QtCore/private/qjnihelpers_p.h>
 
 QT_BEGIN_NAMESPACE
@@ -78,6 +77,7 @@ QAndroidCameraSession::QAndroidCameraSession(QObject *parent)
     , m_captureCanceled(false)
     , m_currentImageCaptureId(-1)
     , m_previewCallback(0)
+    , m_keepActive(false)
 {
     m_mediaStorageLocation.addStorageLocation(
                 QMediaStorageLocation::Pictures,
@@ -183,7 +183,7 @@ bool QAndroidCameraSession::open()
     m_status = QCamera::LoadingStatus;
     emit statusChanged(m_status);
 
-    m_camera = AndroidCamera::requestCameraPermission() ? AndroidCamera::open(m_selectedCamera) : nullptr;
+    m_camera = AndroidCamera::open(m_selectedCamera);
 
     if (m_camera) {
         connect(m_camera, SIGNAL(pictureExposed()), this, SLOT(onCameraPictureExposed()));
@@ -748,7 +748,7 @@ void QAndroidCameraSession::processPreviewImage(int id, const QVideoFrame &frame
         transform.scale(-1, 1);
     transform.rotate(rotation);
 
-    emit imageCaptured(id, qt_imageFromVideoFrame(frame).transformed(transform));
+    emit imageCaptured(id, frame.image().transformed(transform));
 }
 
 void QAndroidCameraSession::onNewPreviewFrame(const QVideoFrame &frame)
@@ -913,7 +913,7 @@ void QAndroidCameraSession::onApplicationStateChanged(Qt::ApplicationState state
 {
     switch (state) {
     case Qt::ApplicationInactive:
-        if (m_state != QCamera::UnloadedState) {
+        if (!m_keepActive && m_state != QCamera::UnloadedState) {
             m_savedState = m_state;
             close();
             m_state = QCamera::UnloadedState;
@@ -929,6 +929,14 @@ void QAndroidCameraSession::onApplicationStateChanged(Qt::ApplicationState state
     default:
         break;
     }
+}
+
+bool QAndroidCameraSession::requestRecordingPermission()
+{
+    m_keepActive = true;
+    const bool result = qt_androidRequestRecordingPermission();
+    m_keepActive = false;
+    return result;
 }
 
 QT_END_NAMESPACE

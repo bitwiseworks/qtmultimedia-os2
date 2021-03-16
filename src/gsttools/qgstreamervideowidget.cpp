@@ -38,6 +38,7 @@
 ****************************************************************************/
 
 #include "qgstreamervideowidget_p.h"
+#include "qgstutils_p.h"
 
 #include <QtCore/qcoreevent.h>
 #include <QtCore/qdebug.h>
@@ -95,10 +96,6 @@ protected:
 QGstreamerVideoWidgetControl::QGstreamerVideoWidgetControl(QObject *parent, const QByteArray &elementName)
     : QVideoWidgetControl(parent)
     , m_videoOverlay(this, !elementName.isEmpty() ? elementName : qgetenv("QT_GSTREAMER_WIDGET_VIDEOSINK"))
-    , m_widget(0)
-    , m_stopped(false)
-    , m_windowId(0)
-    , m_fullScreen(false)
 {
     connect(&m_videoOverlay, &QGstreamerVideoOverlay::activeChanged,
             this, &QGstreamerVideoWidgetControl::onOverlayActiveChanged);
@@ -173,6 +170,9 @@ bool QGstreamerVideoWidgetControl::eventFilter(QObject *object, QEvent *e)
         }
 
         if (e->type() == QEvent::Paint) {
+            // Update overlay by new size if any.
+            if (QGstUtils::useOpenGL())
+                m_videoOverlay.setRenderRectangle(QRect(0, 0, m_widget->width(), m_widget->height()));
             if (m_videoOverlay.isActive())
                 m_videoOverlay.expose(); // triggers a repaint of the last frame
             else
