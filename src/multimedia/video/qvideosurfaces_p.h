@@ -1,6 +1,6 @@
 /****************************************************************************
 **
-** Copyright (C) 2016 Canonical Ltd.
+** Copyright (C) 2020 The Qt Company Ltd.
 ** Contact: https://www.qt.io/licensing/
 **
 ** This file is part of the Qt Toolkit.
@@ -37,8 +37,8 @@
 **
 ****************************************************************************/
 
-#ifndef QGSTREAMERMIRTEXTURERENDERER_H
-#define QGSTREAMERMIRTEXTURERENDERER_H
+#ifndef QVIDEOSURFACES_P_H
+#define QVIDEOSURFACES_P_H
 
 //
 //  W A R N I N G
@@ -51,69 +51,27 @@
 // We mean it.
 //
 
-#include <qmediaplayer.h>
-#include <qvideorenderercontrol.h>
-#include <private/qvideosurfacegstsink_p.h>
-#include <qabstractvideosurface.h>
-
-#include "qgstreamervideorendererinterface_p.h"
+#include <QAbstractVideoSurface>
+#include <QVector>
 
 QT_BEGIN_NAMESPACE
 
-class QGstreamerMirTextureBuffer;
-class QGstreamerPlayerSession;
-class QGLContext;
-class QOpenGLContext;
-class QSurfaceFormat;
-
-class QGstreamerMirTextureRenderer : public QVideoRendererControl, public QGstreamerVideoRendererInterface
+class QVideoSurfaces : public QAbstractVideoSurface
 {
-    Q_OBJECT
-    Q_INTERFACES(QGstreamerVideoRendererInterface)
 public:
-    QGstreamerMirTextureRenderer(QObject *parent = 0, const QGstreamerPlayerSession *playerSession = 0);
-    virtual ~QGstreamerMirTextureRenderer();
+    QVideoSurfaces(const QVector<QAbstractVideoSurface *> &surfaces, QObject *parent = nullptr);
+    ~QVideoSurfaces();
 
-    QAbstractVideoSurface *surface() const;
-    void setSurface(QAbstractVideoSurface *surface);
-
-    void setPlayerSession(const QGstreamerPlayerSession *playerSession);
-
-    GstElement *videoSink();
-
-    void stopRenderer();
-    bool isReady() const { return m_surface != 0; }
-
-signals:
-    void sinkChanged();
-    void readyChanged(bool);
-    void nativeSizeChanged();
-
-private slots:
-    void handleFormatChange();
-    void updateNativeVideoSize();
-    void handleFocusWindowChanged(QWindow *window);
-    void renderFrame();
+    QList<QVideoFrame::PixelFormat> supportedPixelFormats(QAbstractVideoBuffer::HandleType type) const override;
+    bool start(const QVideoSurfaceFormat &format) override;
+    void stop() override;
+    bool present(const QVideoFrame &frame) override;
 
 private:
-    QWindow *createOffscreenWindow(const QSurfaceFormat &format);
-    static void handleFrameReady(gpointer userData);
-    static GstPadProbeReturn padBufferProbe(GstPad *pad, GstPadProbeInfo *info, gpointer userData);
-
-    GstElement *m_videoSink;
-    QPointer<QAbstractVideoSurface> m_surface;
-    QPointer<QAbstractVideoSurface> m_glSurface;
-    QGLContext *m_context;
-    QOpenGLContext *m_glContext;
-    unsigned int m_textureId;
-    QWindow *m_offscreenSurface;
-    QGstreamerPlayerSession *m_playerSession;
-    QGstreamerMirTextureBuffer *m_textureBuffer;
-    QSize m_nativeSize;
-
-    QMutex m_mutex;
+    QVector<QAbstractVideoSurface *> m_surfaces;
+    Q_DISABLE_COPY(QVideoSurfaces)
 };
 
 QT_END_NAMESPACE
 
-#endif // QGSTREAMERMIRTEXTURERENDRER_H
+#endif // QVIDEOSURFACES_P_H

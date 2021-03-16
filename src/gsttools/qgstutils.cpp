@@ -424,7 +424,7 @@ GstCaps *QGstUtils::capsForAudioFormat(const QAudioFormat &format)
                     "format"  , G_TYPE_STRING, gst_audio_format_to_string(qt_audioLookup[i].format),
                     "rate"    , G_TYPE_INT   , format.sampleRate(),
                     "channels", G_TYPE_INT   , format.channelCount(),
-                    NULL);
+                    nullptr);
     }
     return 0;
 #else
@@ -432,29 +432,29 @@ GstCaps *QGstUtils::capsForAudioFormat(const QAudioFormat &format)
 
     if (format.isValid()) {
         if (format.sampleType() == QAudioFormat::SignedInt || format.sampleType() == QAudioFormat::UnSignedInt) {
-            structure = gst_structure_new("audio/x-raw-int", NULL);
+            structure = gst_structure_new("audio/x-raw-int", nullptr);
         } else if (format.sampleType() == QAudioFormat::Float) {
-            structure = gst_structure_new("audio/x-raw-float", NULL);
+            structure = gst_structure_new("audio/x-raw-float", nullptr);
         }
     }
 
     GstCaps *caps = 0;
 
     if (structure) {
-        gst_structure_set(structure, "rate", G_TYPE_INT, format.sampleRate(), NULL);
-        gst_structure_set(structure, "channels", G_TYPE_INT, format.channelCount(), NULL);
-        gst_structure_set(structure, "width", G_TYPE_INT, format.sampleSize(), NULL);
-        gst_structure_set(structure, "depth", G_TYPE_INT, format.sampleSize(), NULL);
+        gst_structure_set(structure, "rate", G_TYPE_INT, format.sampleRate(), nullptr);
+        gst_structure_set(structure, "channels", G_TYPE_INT, format.channelCount(), nullptr);
+        gst_structure_set(structure, "width", G_TYPE_INT, format.sampleSize(), nullptr);
+        gst_structure_set(structure, "depth", G_TYPE_INT, format.sampleSize(), nullptr);
 
         if (format.byteOrder() == QAudioFormat::LittleEndian)
-            gst_structure_set(structure, "endianness", G_TYPE_INT, 1234, NULL);
+            gst_structure_set(structure, "endianness", G_TYPE_INT, 1234, nullptr);
         else if (format.byteOrder() == QAudioFormat::BigEndian)
-            gst_structure_set(structure, "endianness", G_TYPE_INT, 4321, NULL);
+            gst_structure_set(structure, "endianness", G_TYPE_INT, 4321, nullptr);
 
         if (format.sampleType() == QAudioFormat::SignedInt)
-            gst_structure_set(structure, "signed", G_TYPE_BOOLEAN, TRUE, NULL);
+            gst_structure_set(structure, "signed", G_TYPE_BOOLEAN, TRUE, nullptr);
         else if (format.sampleType() == QAudioFormat::UnSignedInt)
-            gst_structure_set(structure, "signed", G_TYPE_BOOLEAN, FALSE, NULL);
+            gst_structure_set(structure, "signed", G_TYPE_BOOLEAN, FALSE, nullptr);
 
         caps = gst_caps_new_empty();
         Q_ASSERT(caps);
@@ -470,7 +470,7 @@ void QGstUtils::initializeGst()
     static bool initialized = false;
     if (!initialized) {
         initialized = true;
-        gst_init(NULL, NULL);
+        gst_init(nullptr, nullptr);
     }
 }
 
@@ -606,8 +606,8 @@ QVector<QGstUtils::CameraInfo> QGstUtils::enumerateCameras(GstElementFactory *fa
                         // no-op
                     } else for (int i = 0; i < 2; ++i) {
                         gint orientation = 0;
-                        g_object_set(G_OBJECT(camera), "camera-device", i, NULL);
-                        g_object_get(G_OBJECT(camera), "sensor-mount-angle", &orientation, NULL);
+                        g_object_set(G_OBJECT(camera), "camera-device", i, nullptr);
+                        g_object_get(G_OBJECT(camera), "sensor-mount-angle", &orientation, nullptr);
 
                         devices[i].orientation = (720 - orientation) % 360;
                     }
@@ -807,7 +807,7 @@ QSet<QString> QGstUtils::supportedMimeTypes(bool (*isValidFactory)(GstElementFac
     QSet<QString> supportedMimeTypes;
 
     //enumerate supported mime types
-    gst_init(NULL, NULL);
+    gst_init(nullptr, nullptr);
 
 #if GST_CHECK_VERSION(1,0,0)
     GstRegistry *registry = gst_registry_get();
@@ -829,7 +829,7 @@ QSet<QString> QGstUtils::supportedMimeTypes(bool (*isValidFactory)(GstElementFac
         GList *orig_features = gst_registry_get_feature_list_by_plugin(
                     registry, gst_plugin_get_name(plugin));
         for (GList *features = orig_features; features; features = g_list_next(features)) {
-            if (G_UNLIKELY(features->data == NULL))
+            if (G_UNLIKELY(features->data == nullptr))
                 continue;
 
             GstPluginFeature *feature = GST_PLUGIN_FEATURE(features->data);
@@ -866,7 +866,7 @@ QSet<QString> QGstUtils::supportedMimeTypes(bool (*isValidFactory)(GstElementFac
                             if (value) {
                                 gchar *str = gst_value_serialize(value);
                                 QString versions = QLatin1String(str);
-                                const QStringList elements = versions.split(QRegularExpression(QLatin1String("\\D+")), QString::SkipEmptyParts);
+                                const QStringList elements = versions.split(QRegularExpression(QLatin1String("\\D+")), Qt::SkipEmptyParts);
                                 for (const QString &e : elements)
                                     supportedMimeTypes.insert(nameLowcase + e);
                                 g_free(str);
@@ -1034,6 +1034,7 @@ struct VideoFormat
 static const VideoFormat qt_videoFormatLookup[] =
 {
     { QVideoFrame::Format_YUV420P, GST_VIDEO_FORMAT_I420 },
+    { QVideoFrame::Format_YUV422P, GST_VIDEO_FORMAT_Y42B },
     { QVideoFrame::Format_YV12   , GST_VIDEO_FORMAT_YV12 },
     { QVideoFrame::Format_UYVY   , GST_VIDEO_FORMAT_UYVY },
     { QVideoFrame::Format_YUYV   , GST_VIDEO_FORMAT_YUY2 },
@@ -1044,11 +1045,13 @@ static const VideoFormat qt_videoFormatLookup[] =
     { QVideoFrame::Format_RGB32 ,  GST_VIDEO_FORMAT_BGRx },
     { QVideoFrame::Format_BGR32 ,  GST_VIDEO_FORMAT_RGBx },
     { QVideoFrame::Format_ARGB32,  GST_VIDEO_FORMAT_BGRA },
+    { QVideoFrame::Format_ABGR32,  GST_VIDEO_FORMAT_RGBA },
     { QVideoFrame::Format_BGRA32,  GST_VIDEO_FORMAT_ARGB },
 #else
     { QVideoFrame::Format_RGB32 ,  GST_VIDEO_FORMAT_xRGB },
     { QVideoFrame::Format_BGR32 ,  GST_VIDEO_FORMAT_xBGR },
     { QVideoFrame::Format_ARGB32,  GST_VIDEO_FORMAT_ARGB },
+    { QVideoFrame::Format_ABGR32,  GST_VIDEO_FORMAT_ABGR },
     { QVideoFrame::Format_BGRA32,  GST_VIDEO_FORMAT_BGRA },
 #endif
     { QVideoFrame::Format_RGB24 ,  GST_VIDEO_FORMAT_RGB },
@@ -1086,6 +1089,7 @@ struct YuvFormat
 static const YuvFormat qt_yuvColorLookup[] =
 {
     { QVideoFrame::Format_YUV420P, GST_MAKE_FOURCC('I','4','2','0'), 8 },
+    { QVideoFrame::Format_YUV422P, GST_MAKE_FOURCC('Y','4','2','B'), 8 },
     { QVideoFrame::Format_YV12,    GST_MAKE_FOURCC('Y','V','1','2'), 8 },
     { QVideoFrame::Format_UYVY,    GST_MAKE_FOURCC('U','Y','V','Y'), 16 },
     { QVideoFrame::Format_YUYV,    GST_MAKE_FOURCC('Y','U','Y','2'), 16 },
@@ -1234,7 +1238,7 @@ GstCaps *QGstUtils::capsForFormats(const QList<QVideoFrame::PixelFormat> &format
             gst_caps_append_structure(caps, gst_structure_new(
                     "video/x-raw",
                     "format"   , G_TYPE_STRING, gst_video_format_to_string(qt_videoFormatLookup[index].gstFormat),
-                    NULL));
+                    nullptr));
         }
     }
 #else
@@ -1245,7 +1249,7 @@ GstCaps *QGstUtils::capsForFormats(const QList<QVideoFrame::PixelFormat> &format
             gst_caps_append_structure(caps, gst_structure_new(
                     "video/x-raw-yuv",
                     "format", GST_TYPE_FOURCC, qt_yuvColorLookup[index].fourcc,
-                    NULL));
+                    nullptr));
             continue;
         }
 
@@ -1261,11 +1265,11 @@ GstCaps *QGstUtils::capsForFormats(const QList<QVideoFrame::PixelFormat> &format
                         "red_mask"  , G_TYPE_INT, qt_rgbColorLookup[i].red,
                         "green_mask", G_TYPE_INT, qt_rgbColorLookup[i].green,
                         "blue_mask" , G_TYPE_INT, qt_rgbColorLookup[i].blue,
-                        NULL);
+                        nullptr);
 
                 if (qt_rgbColorLookup[i].alpha != 0) {
                     gst_structure_set(
-                            structure, "alpha_mask", G_TYPE_INT, qt_rgbColorLookup[i].alpha, NULL);
+                            structure, "alpha_mask", G_TYPE_INT, qt_rgbColorLookup[i].alpha, nullptr);
                 }
                 gst_caps_append_structure(caps, structure);
             }
@@ -1278,7 +1282,7 @@ GstCaps *QGstUtils::capsForFormats(const QList<QVideoFrame::PixelFormat> &format
                 "framerate", GST_TYPE_FRACTION_RANGE, 0, 1, INT_MAX, 1,
                 "width"    , GST_TYPE_INT_RANGE, 1, INT_MAX,
                 "height"   , GST_TYPE_INT_RANGE, 1, INT_MAX,
-                NULL);
+                nullptr);
 
     return caps;
 }
@@ -1303,11 +1307,9 @@ void QGstUtils::setMetaData(GstElement *element, const QMap<QByteArray, QVariant
 
     gst_tag_setter_reset_tags(GST_TAG_SETTER(element));
 
-    QMapIterator<QByteArray, QVariant> it(data);
-    while (it.hasNext()) {
-        it.next();
+    for (auto it = data.cbegin(), end = data.cend(); it != end; ++it) {
         const QString tagName = QString::fromLatin1(it.key());
-        const QVariant tagValue = it.value();
+        const QVariant &tagValue = it.value();
 
         switch (tagValue.type()) {
             case QVariant::String:
@@ -1315,7 +1317,7 @@ void QGstUtils::setMetaData(GstElement *element, const QMap<QByteArray, QVariant
                     GST_TAG_MERGE_REPLACE,
                     tagName.toUtf8().constData(),
                     tagValue.toString().toUtf8().constData(),
-                    NULL);
+                    nullptr);
                 break;
             case QVariant::Int:
             case QVariant::LongLong:
@@ -1323,14 +1325,14 @@ void QGstUtils::setMetaData(GstElement *element, const QMap<QByteArray, QVariant
                     GST_TAG_MERGE_REPLACE,
                     tagName.toUtf8().constData(),
                     tagValue.toInt(),
-                    NULL);
+                    nullptr);
                 break;
             case QVariant::Double:
                 gst_tag_setter_add_tags(GST_TAG_SETTER(element),
                     GST_TAG_MERGE_REPLACE,
                     tagName.toUtf8().constData(),
                     tagValue.toDouble(),
-                    NULL);
+                    nullptr);
                 break;
 #if GST_CHECK_VERSION(0, 10, 31)
             case QVariant::DateTime: {
@@ -1341,7 +1343,7 @@ void QGstUtils::setMetaData(GstElement *element, const QMap<QByteArray, QVariant
                     gst_date_time_new_local_time(
                                 date.date().year(), date.date().month(), date.date().day(),
                                 date.time().hour(), date.time().minute(), date.time().second()),
-                    NULL);
+                    nullptr);
                 break;
             }
 #endif
@@ -1566,6 +1568,12 @@ QVariant QGstUtils::toGStreamerOrientation(const QVariant &value)
 }
 #endif
 
+bool QGstUtils::useOpenGL()
+{
+    static bool result = qEnvironmentVariableIntValue("QT_GSTREAMER_USE_OPENGL_PLUGIN");
+    return result;
+}
+
 void qt_gst_object_ref_sink(gpointer object)
 {
 #if GST_CHECK_VERSION(0,10,24)
@@ -1596,7 +1604,7 @@ GstCaps *qt_gst_pad_get_current_caps(GstPad *pad)
 GstCaps *qt_gst_pad_get_caps(GstPad *pad)
 {
 #if GST_CHECK_VERSION(1,0,0)
-    return gst_pad_query_caps(pad, NULL);
+    return gst_pad_query_caps(pad, nullptr);
 #elif GST_CHECK_VERSION(0, 10, 26)
     return gst_pad_get_caps_reffed(pad);
 #else
@@ -1609,7 +1617,7 @@ GstStructure *qt_gst_structure_new_empty(const char *name)
 #if GST_CHECK_VERSION(1,0,0)
     return gst_structure_new_empty(name);
 #else
-    return gst_structure_new(name, NULL);
+    return gst_structure_new(name, nullptr);
 #endif
 }
 
@@ -1701,7 +1709,7 @@ static gint qt_gst_compare_ranks(GstPluginFeature *f1, GstPluginFeature *f2)
 
 GList *qt_gst_video_sinks()
 {
-    GList *list = NULL;
+    GList *list = nullptr;
 
 #if GST_CHECK_VERSION(0, 10, 31)
     list = gst_element_factory_list_get_elements(GST_ELEMENT_FACTORY_TYPE_SINK | GST_ELEMENT_FACTORY_TYPE_MEDIA_VIDEO,
@@ -1709,7 +1717,7 @@ GList *qt_gst_video_sinks()
 #else
     list = gst_registry_feature_filter(gst_registry_get_default(),
                                        (GstPluginFeatureFilter)qt_gst_videosink_factory_filter,
-                                       FALSE, NULL);
+                                       FALSE, nullptr);
     list = g_list_sort(list, (GCompareFunc)qt_gst_compare_ranks);
 #endif
 

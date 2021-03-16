@@ -48,6 +48,8 @@
 #include <gst/video/videooverlay.h>
 #endif
 
+#include <QtMultimedia/private/qtmultimediaglobal_p.h>
+
 QT_BEGIN_NAMESPACE
 
 struct ElementMap
@@ -59,6 +61,9 @@ struct ElementMap
 // Ordered by descending priority
 static const ElementMap elementMap[] =
 {
+#if QT_CONFIG(gstreamer_gl)
+    { "xcb", "glimagesink" },
+#endif
     { "xcb", "vaapisink" },
     { "xcb", "xvimagesink" },
     { "xcb", "ximagesink" }
@@ -117,7 +122,7 @@ public:
     {
         int brightness = 0;
         if (m_hasBrightness)
-            g_object_get(G_OBJECT(m_videoSink), "brightness", &brightness, NULL);
+            g_object_get(G_OBJECT(m_videoSink), "brightness", &brightness, nullptr);
 
         return brightness / 10;
     }
@@ -126,7 +131,7 @@ public:
     {
         m_brightness = brightness;
         if (m_hasBrightness)
-            g_object_set(G_OBJECT(m_videoSink), "brightness", brightness * 10, NULL);
+            g_object_set(G_OBJECT(m_videoSink), "brightness", brightness * 10, nullptr);
 
         return m_hasBrightness;
     }
@@ -135,7 +140,7 @@ public:
     {
         int contrast = 0;
         if (m_hasContrast)
-            g_object_get(G_OBJECT(m_videoSink), "contrast", &contrast, NULL);
+            g_object_get(G_OBJECT(m_videoSink), "contrast", &contrast, nullptr);
 
         return contrast / 10;
     }
@@ -144,7 +149,7 @@ public:
     {
         m_contrast = contrast;
         if (m_hasContrast)
-            g_object_set(G_OBJECT(m_videoSink), "contrast", contrast * 10, NULL);
+            g_object_set(G_OBJECT(m_videoSink), "contrast", contrast * 10, nullptr);
 
         return m_hasContrast;
     }
@@ -153,7 +158,7 @@ public:
     {
         int hue = 0;
         if (m_hasHue)
-            g_object_get(G_OBJECT(m_videoSink), "hue", &hue, NULL);
+            g_object_get(G_OBJECT(m_videoSink), "hue", &hue, nullptr);
 
         return hue / 10;
     }
@@ -162,7 +167,7 @@ public:
     {
         m_hue = hue;
         if (m_hasHue)
-            g_object_set(G_OBJECT(m_videoSink), "hue", hue * 10, NULL);
+            g_object_set(G_OBJECT(m_videoSink), "hue", hue * 10, nullptr);
 
         return m_hasHue;
     }
@@ -171,7 +176,7 @@ public:
     {
         int saturation = 0;
         if (m_hasSaturation)
-            g_object_get(G_OBJECT(m_videoSink), "saturation", &saturation, NULL);
+            g_object_get(G_OBJECT(m_videoSink), "saturation", &saturation, nullptr);
 
         return saturation / 10;
     }
@@ -180,7 +185,7 @@ public:
     {
         m_saturation = saturation;
         if (m_hasSaturation)
-            g_object_set(G_OBJECT(m_videoSink), "saturation", saturation * 10, NULL);
+            g_object_set(G_OBJECT(m_videoSink), "saturation", saturation * 10, nullptr);
 
         return m_hasSaturation;
     }
@@ -190,7 +195,7 @@ public:
         Qt::AspectRatioMode mode = Qt::KeepAspectRatio;
         if (m_hasForceAspectRatio) {
             gboolean forceAR = false;
-            g_object_get(G_OBJECT(m_videoSink), "force-aspect-ratio", &forceAR, NULL);
+            g_object_get(G_OBJECT(m_videoSink), "force-aspect-ratio", &forceAR, nullptr);
             if (!forceAR)
                 mode = Qt::IgnoreAspectRatio;
         }
@@ -205,7 +210,7 @@ public:
             g_object_set(G_OBJECT(m_videoSink),
                          "force-aspect-ratio",
                          (mode == Qt::KeepAspectRatio),
-                         (const char*)NULL);
+                         nullptr);
         }
     }
 
@@ -240,7 +245,7 @@ public:
     {
         gfloat brightness = 0;
         if (m_hasBrightness)
-            g_object_get(G_OBJECT(m_videoSink), "brightness", &brightness, NULL);
+            g_object_get(G_OBJECT(m_videoSink), "brightness", &brightness, nullptr);
 
         return brightness * 100; // [-1,1] -> [-100,100]
     }
@@ -250,7 +255,7 @@ public:
         m_brightness = brightness;
         if (m_hasBrightness) {
             gfloat v = brightness / 100.0; // [-100,100] -> [-1,1]
-            g_object_set(G_OBJECT(m_videoSink), "brightness", v, NULL);
+            g_object_set(G_OBJECT(m_videoSink), "brightness", v, nullptr);
         }
 
         return m_hasBrightness;
@@ -260,7 +265,7 @@ public:
     {
         gfloat contrast = 1;
         if (m_hasContrast)
-            g_object_get(G_OBJECT(m_videoSink), "contrast", &contrast, NULL);
+            g_object_get(G_OBJECT(m_videoSink), "contrast", &contrast, nullptr);
 
         return (contrast - 1) * 100; // [0,2] -> [-100,100]
     }
@@ -270,7 +275,7 @@ public:
         m_contrast = contrast;
         if (m_hasContrast) {
             gfloat v = (contrast / 100.0) + 1; // [-100,100] -> [0,2]
-            g_object_set(G_OBJECT(m_videoSink), "contrast", v, NULL);
+            g_object_set(G_OBJECT(m_videoSink), "contrast", v, nullptr);
         }
 
         return m_hasContrast;
@@ -280,7 +285,7 @@ public:
     {
         gfloat hue = 0;
         if (m_hasHue)
-            g_object_get(G_OBJECT(m_videoSink), "hue", &hue, NULL);
+            g_object_get(G_OBJECT(m_videoSink), "hue", &hue, nullptr);
 
         return hue / 180 * 100; // [-180,180] -> [-100,100]
     }
@@ -290,7 +295,7 @@ public:
         m_hue = hue;
         if (m_hasHue) {
             gfloat v = hue / 100.0 * 180; // [-100,100] -> [-180,180]
-            g_object_set(G_OBJECT(m_videoSink), "hue", v, NULL);
+            g_object_set(G_OBJECT(m_videoSink), "hue", v, nullptr);
         }
 
         return m_hasHue;
@@ -300,7 +305,7 @@ public:
     {
         gfloat saturation = 1;
         if (m_hasSaturation)
-            g_object_get(G_OBJECT(m_videoSink), "saturation", &saturation, NULL);
+            g_object_get(G_OBJECT(m_videoSink), "saturation", &saturation, nullptr);
 
         return (saturation - 1) * 100; // [0,2] -> [-100,100]
     }
@@ -310,7 +315,7 @@ public:
         m_saturation = saturation;
         if (m_hasSaturation) {
             gfloat v = (saturation / 100.0) + 1; // [-100,100] -> [0,2]
-            g_object_set(G_OBJECT(m_videoSink), "saturation", v, NULL);
+            g_object_set(G_OBJECT(m_videoSink), "saturation", v, nullptr);
         }
 
         return m_hasSaturation;
@@ -340,8 +345,12 @@ static GstElement *findBestVideoSink()
 
     // First, try some known video sinks, depending on the Qt platform plugin in use.
     for (quint32 i = 0; i < (sizeof(elementMap) / sizeof(ElementMap)); ++i) {
+#if QT_CONFIG(gstreamer_gl)
+        if (!QGstUtils::useOpenGL() && qstrcmp(elementMap[i].gstreamerElement, "glimagesink") == 0)
+            continue;
+#endif
         if (platform == QLatin1String(elementMap[i].qtPlatform)
-                && (choice = gst_element_factory_make(elementMap[i].gstreamerElement, NULL))) {
+                && (choice = gst_element_factory_make(elementMap[i].gstreamerElement, nullptr))) {
 
             if (qt_gst_element_is_functioning(choice))
                 return choice;
@@ -354,13 +363,13 @@ static GstElement *findBestVideoSink()
     // If none of the known video sinks are available, try to find one that implements the
     // GstVideoOverlay interface and has autoplugging rank.
     GList *list = qt_gst_video_sinks();
-    for (GList *item = list; item != NULL; item = item->next) {
+    for (GList *item = list; item != nullptr; item = item->next) {
         GstElementFactory *f = GST_ELEMENT_FACTORY(item->data);
 
         if (!gst_element_factory_has_interface(f, QT_GSTREAMER_VIDEOOVERLAY_INTERFACE_NAME))
             continue;
 
-        if (GstElement *el = gst_element_factory_create(f, NULL)) {
+        if (GstElement *el = gst_element_factory_create(f, nullptr)) {
             if (qt_gst_element_is_functioning(el)) {
                 choice = el;
                 break;
@@ -381,7 +390,7 @@ QGstreamerVideoOverlay::QGstreamerVideoOverlay(QObject *parent, const QByteArray
 {
     GstElement *sink = nullptr;
     if (!elementName.isEmpty())
-        sink = gst_element_factory_make(elementName.constData(), NULL);
+        sink = gst_element_factory_make(elementName.constData(), nullptr);
     else
         sink = findBestVideoSink();
 
@@ -558,7 +567,7 @@ void QGstreamerVideoOverlay::updateIsActive()
     gboolean showPreroll = true;
 
     if (m_sinkProperties->hasShowPrerollFrame())
-        g_object_get(G_OBJECT(m_videoSink), "show-preroll-frame", &showPreroll, NULL);
+        g_object_get(G_OBJECT(m_videoSink), "show-preroll-frame", &showPreroll, nullptr);
 
     bool newIsActive = (state == GST_STATE_PLAYING || (state == GST_STATE_PAUSED && showPreroll));
 

@@ -45,6 +45,7 @@ QT_BEGIN_NAMESPACE
 
 /*!
     \class QMetaDataWriterControl
+    \obsolete
     \inmodule QtMultimedia
 
 
@@ -163,6 +164,6 @@ QMetaDataWriterControl::~QMetaDataWriterControl()
     true if meta-data elements can be added or adjusted.
 */
 
-#include "moc_qmetadatawritercontrol.cpp"
 QT_END_NAMESPACE
 
+#include "moc_qmetadatawritercontrol.cpp"

@@ -149,9 +149,7 @@ gboolean CameraBinImageCapture::encoderEventProbe(
         tags[QMediaMetaData::FNumber] = extendedTags.value("capturing-focal-ratio");
         tags[QMediaMetaData::ExposureMode] = extendedTags.value("capturing-exposure-mode");
 
-        QMapIterator<QString, QVariant> i(tags);
-        while (i.hasNext()) {
-            i.next();
+        for (auto i = tags.cbegin(), end = tags.cend(); i != end; ++i) {
             if (i.value().isValid()) {
                 QMetaObject::invokeMethod(self, "imageMetadataAvailable",
                                           Qt::QueuedConnection,
@@ -368,12 +366,9 @@ bool CameraBinImageCapture::processBusMessage(const QGstreamerMessage &message)
 #ifdef DEBUG_CAPTURE
                     qDebug() << Q_FUNC_INFO << "Dropped saving file" << fileName;
 #endif
-                    //camerabin creates an empty file when captured buffer is dropped,
-                    //let's remove it
                     QFileInfo info(QString::fromUtf8(fileName));
-                    if (info.exists() && info.isFile() && info.size() == 0) {
+                    if (info.exists() && info.isFile())
                         QFile(info.absoluteFilePath()).remove();
-                    }
                 }
             }
         }

@@ -99,7 +99,7 @@ QStringList QGstCodecsInfo::codecOptions(const QString &codec) const
     if (elementName.isEmpty())
         return options;
 
-    GstElement *element = gst_element_factory_make(elementName, NULL);
+    GstElement *element = gst_element_factory_make(elementName, nullptr);
     if (element) {
         guint numProperties;
         GParamSpec **properties = g_object_class_list_properties(G_OBJECT_GET_CLASS(element),
@@ -174,7 +174,7 @@ void QGstCodecsInfo::updateCodecs(ElementType elementType)
                         }
                     }
 
-                    GstCaps *newCaps = gst_caps_new_full(newStructure, NULL);
+                    GstCaps *newCaps = gst_caps_new_full(newStructure, nullptr);
 
                     gchar *capsString = gst_caps_to_string(newCaps);
                     QString codec = QLatin1String(capsString);
@@ -263,7 +263,16 @@ GList *QGstCodecsInfo::elementFactories(ElementType elementType) const
         break;
     }
 
-    return gst_element_factory_list_get_elements(gstElementType, GST_RANK_MARGINAL);
+    GList *list = gst_element_factory_list_get_elements(gstElementType, GST_RANK_MARGINAL);
+    if (elementType == AudioEncoder) {
+        // Manually add "audioconvert" to the list
+        // to allow linking with various containers.
+        auto factory = gst_element_factory_find("audioconvert");
+        if (factory)
+            list = g_list_prepend(list, factory);
+    }
+
+    return list;
 #else
     GList *result = gst_registry_feature_filter(gst_registry_get_default(),
                                                 element_filter,

@@ -44,6 +44,7 @@ QT_BEGIN_NAMESPACE
 
 /*!
     \class QCameraFlashControl
+    \obsolete
 
     \brief The QCameraFlashControl class allows controlling a camera's flash.
 
@@ -128,6 +129,6 @@ QCameraFlashControl::~QCameraFlashControl()
     Signal emitted when flash state changes to \a ready.
 */
 
-#include "moc_qcameraflashcontrol.cpp"
 QT_END_NAMESPACE
 
+#include "moc_qcameraflashcontrol.cpp"

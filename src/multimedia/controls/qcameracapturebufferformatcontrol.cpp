@@ -43,6 +43,7 @@ QT_BEGIN_NAMESPACE
 
 /*!
     \class QCameraCaptureBufferFormatControl
+    \obsolete
 
     \brief The QCameraCaptureBufferFormatControl class provides a control for setting the capture buffer format.
 
@@ -107,6 +108,6 @@ QCameraCaptureBufferFormatControl::~QCameraCaptureBufferFormatControl()
     Signals the buffer image capture format changed to \a format.
 */
 
-#include "moc_qcameracapturebufferformatcontrol.cpp"
 QT_END_NAMESPACE
 
+#include "moc_qcameracapturebufferformatcontrol.cpp"

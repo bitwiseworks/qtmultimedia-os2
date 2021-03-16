@@ -43,6 +43,7 @@ QT_BEGIN_NAMESPACE
 
 /*!
     \class QAudioInputSelectorControl
+    \obsolete
 
     \brief The QAudioInputSelectorControl class provides an audio input selector media control.
     \inmodule QtMultimedia
@@ -125,6 +126,6 @@ QAudioInputSelectorControl::~QAudioInputSelectorControl()
     Signals that list of available inputs has changed.
 */
 
-#include "moc_qaudioinputselectorcontrol.cpp"
 QT_END_NAMESPACE
 
+#include "moc_qaudioinputselectorcontrol.cpp"

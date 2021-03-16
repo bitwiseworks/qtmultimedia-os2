@@ -53,6 +53,7 @@
 #include "qwindowsaudioutils.h"
 #include <QtEndian>
 #include <QtCore/QDataStream>
+#include <QtCore/qtimer.h>
 #include <private/qaudiohelpers_p.h>
 
 //#define DEBUG_AUDIO 1
@@ -629,7 +630,7 @@ qreal QWindowsAudioOutput::volume() const
 
 void QWindowsAudioOutput::reset()
 {
-    close();
+    stop();
 }
 
 OutputPrivate::OutputPrivate(QWindowsAudioOutput* audio)

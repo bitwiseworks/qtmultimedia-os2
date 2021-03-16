@@ -48,6 +48,7 @@
 #include "avfcameraviewfindersettingscontrol.h"
 #include "avfimageencodercontrol.h"
 #include "avfcamerautility.h"
+#include "avfcamerawindowcontrol.h"
 
 #include <CoreFoundation/CoreFoundation.h>
 #include <Foundation/Foundation.h>
@@ -146,6 +147,7 @@ QList<AVFCameraInfo> AVFCameraSession::m_cameraDevices;
 AVFCameraSession::AVFCameraSession(AVFCameraService *service, QObject *parent)
    : QObject(parent)
    , m_service(service)
+   , m_capturePreviewWindowOutput(nullptr)
    , m_state(QCamera::UnloadedState)
    , m_active(false)
    , m_videoInput(nil)
@@ -160,6 +162,10 @@ AVFCameraSession::AVFCameraSession(AVFCameraService *service, QObject *parent)
 
 AVFCameraSession::~AVFCameraSession()
 {
+    if (m_capturePreviewWindowOutput) {
+        m_capturePreviewWindowOutput->setLayer(nil);
+    }
+
     if (m_videoInput) {
         [m_captureSession removeInput:m_videoInput];
         [m_videoInput release];
@@ -234,7 +240,7 @@ void AVFCameraSession::updateCameraDevices()
             break;
         case AVCaptureDevicePositionFront:
             info.position = QCamera::FrontFace;
-            info.orientation = 90;
+            info.orientation = 270;
             break;
         default:
             info.position = QCamera::UnspecifiedPosition;
@@ -255,6 +261,29 @@ void AVFCameraSession::setVideoOutput(AVFCameraRendererControl *output)
     m_videoOutput = output;
     if (output)
         output->configureAVCaptureSession(this);
+}
+
+void AVFCameraSession::setCapturePreviewOutput(AVFCameraWindowControl *output)
+{
+#ifdef QT_DEBUG_AVF
+    qDebug() << Q_FUNC_INFO << output;
+#endif
+
+    if (m_capturePreviewWindowOutput == output)
+        return;
+
+    if (m_capturePreviewWindowOutput)
+        m_capturePreviewWindowOutput->setLayer(nil);
+
+    m_capturePreviewWindowOutput = output;
+
+    if (m_capturePreviewWindowOutput) {
+        AVCaptureVideoPreviewLayer *previewLayer = [AVCaptureVideoPreviewLayer layerWithSession:m_captureSession];
+        m_capturePreviewWindowOutput->setLayer(previewLayer);
+        if (AVFCameraViewfinderSettingsControl2 *vfControl = m_service->viewfinderSettingsControl2()) {
+            m_capturePreviewWindowOutput->setNativeSize(vfControl->viewfinderSettings().resolution());
+        }
+    }
 }
 
 AVCaptureDevice *AVFCameraSession::videoCaptureDevice() const
@@ -408,7 +437,12 @@ bool AVFCameraSession::applyViewfinderSettings()
                 vfSettings.setResolution(imageResolution);
         }
 
-        return vfControl->applySettings(vfSettings);
+        vfControl->applySettings(vfSettings);
+
+        if (m_capturePreviewWindowOutput)
+            m_capturePreviewWindowOutput->setNativeSize(vfControl->viewfinderSettings().resolution());
+
+        return !vfSettings.isNull();
     }
 
     return false;

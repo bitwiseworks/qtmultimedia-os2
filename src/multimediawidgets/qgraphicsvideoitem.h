@@ -60,11 +60,13 @@ class Q_MULTIMEDIAWIDGETS_EXPORT QGraphicsVideoItem : public QGraphicsObject, pu
     Q_PROPERTY(QPointF offset READ offset WRITE setOffset)
     Q_PROPERTY(QSizeF size READ size WRITE setSize)
     Q_PROPERTY(QSizeF nativeSize READ nativeSize NOTIFY nativeSizeChanged)
+    Q_PROPERTY(QAbstractVideoSurface* videoSurface READ videoSurface CONSTANT)
 public:
     explicit QGraphicsVideoItem(QGraphicsItem *parent = nullptr);
     ~QGraphicsVideoItem();
 
     QMediaObject *mediaObject() const override;
+    QAbstractVideoSurface *videoSurface() const;
 
     Qt::AspectRatioMode aspectRatioMode() const;
     void setAspectRatioMode(Qt::AspectRatioMode mode);
@@ -80,6 +82,15 @@ public:
     QRectF boundingRect() const override;
 
     void paint(QPainter *painter, const QStyleOptionGraphicsItem *option, QWidget *widget = nullptr) override;
+
+#if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
+    enum { Type = 14 };
+    int type() const override
+    {
+        // Enable the use of qgraphicsitem_cast with this item.
+        return Type;
+    }
+#endif
 
 Q_SIGNALS:
     void nativeSizeChanged(const QSizeF &size);

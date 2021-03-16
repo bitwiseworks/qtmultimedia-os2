@@ -54,12 +54,30 @@
 
 #include "qgstutils_p.h"
 
+#if QT_CONFIG(gstreamer_gl)
+#include <QOpenGLContext>
+#include <QGuiApplication>
+#include <QWindow>
+#include <qpa/qplatformnativeinterface.h>
+
+#include <gst/gl/gstglconfig.h>
+
+#if GST_GL_HAVE_WINDOW_X11
+#    include <gst/gl/x11/gstgldisplay_x11.h>
+#endif
+#if GST_GL_HAVE_PLATFORM_EGL
+#    include <gst/gl/egl/gstgldisplay_egl.h>
+#endif
+#if GST_CHECK_VERSION(1,11,1) && GST_GL_HAVE_WINDOW_WAYLAND
+#    include <gst/gl/wayland/gstgldisplay_wayland.h>
+#endif
+#endif // #if QT_CONFIG(gstreamer_gl)
+
 //#define DEBUG_VIDEO_SURFACE_SINK
 
 QT_BEGIN_NAMESPACE
 
 QGstDefaultVideoRenderer::QGstDefaultVideoRenderer()
-    : m_flushed(true)
 {
 }
 
@@ -69,13 +87,33 @@ QGstDefaultVideoRenderer::~QGstDefaultVideoRenderer()
 
 GstCaps *QGstDefaultVideoRenderer::getCaps(QAbstractVideoSurface *surface)
 {
-    return QGstUtils::capsForFormats(surface->supportedPixelFormats());
+#if QT_CONFIG(gstreamer_gl)
+    if (QGstUtils::useOpenGL()) {
+        m_handleType = QAbstractVideoBuffer::GLTextureHandle;
+        auto formats = surface->supportedPixelFormats(m_handleType);
+        // Even if the surface does not support gl textures,
+        // glupload will be added to the pipeline and GLMemory will be requested.
+        // This will lead to upload data to gl textures
+        // and download it when the buffer will be used within rendering.
+        if (formats.isEmpty()) {
+            m_handleType = QAbstractVideoBuffer::NoHandle;
+            formats = surface->supportedPixelFormats(m_handleType);
+        }
+
+        GstCaps *caps = QGstUtils::capsForFormats(formats);
+        for (guint i = 0; i < gst_caps_get_size(caps); ++i)
+            gst_caps_set_features(caps, i, gst_caps_features_from_string("memory:GLMemory"));
+
+        return caps;
+    }
+#endif
+    return QGstUtils::capsForFormats(surface->supportedPixelFormats(QAbstractVideoBuffer::NoHandle));
 }
 
 bool QGstDefaultVideoRenderer::start(QAbstractVideoSurface *surface, GstCaps *caps)
 {
     m_flushed = true;
-    m_format = QGstUtils::formatForCaps(caps, &m_videoInfo);
+    m_format = QGstUtils::formatForCaps(caps, &m_videoInfo, m_handleType);
 
     return m_format.isValid() && surface->start(m_format);
 }
@@ -90,8 +128,34 @@ void QGstDefaultVideoRenderer::stop(QAbstractVideoSurface *surface)
 bool QGstDefaultVideoRenderer::present(QAbstractVideoSurface *surface, GstBuffer *buffer)
 {
     m_flushed = false;
+
+    QGstVideoBuffer *videoBuffer = nullptr;
+#if QT_CONFIG(gstreamer_gl)
+    if (m_format.handleType() == QAbstractVideoBuffer::GLTextureHandle) {
+        GstGLMemory *glmem = GST_GL_MEMORY_CAST(gst_buffer_peek_memory(buffer, 0));
+        guint textureId = gst_gl_memory_get_texture_id(glmem);
+        videoBuffer = new QGstVideoBuffer(buffer, m_videoInfo, m_format.handleType(), textureId);
+    }
+#endif
+
+    if (!videoBuffer)
+        videoBuffer = new QGstVideoBuffer(buffer, m_videoInfo);
+
+    auto meta = gst_buffer_get_video_crop_meta (buffer);
+    if (meta) {
+        QRect vp(meta->x, meta->y, meta->width, meta->height);
+        if (m_format.viewport() != vp) {
+#ifdef DEBUG_VIDEO_SURFACE_SINK
+            qDebug() << Q_FUNC_INFO << " Update viewport on Metadata: [" << meta->height << "x" << meta->width << " | " << meta->x << "x" << meta->y << "]";
+#endif
+            //Update viewport if data is not the same
+            m_format.setViewport(vp);
+            surface->start(m_format);
+        }
+    }
+
     QVideoFrame frame(
-                new QGstVideoBuffer(buffer, m_videoInfo),
+                videoBuffer,
                 m_format.frameSize(),
                 m_format.pixelFormat());
     QGstUtils::setFrameTimeStamps(&frame, buffer);
@@ -116,19 +180,11 @@ Q_GLOBAL_STATIC_WITH_ARGS(QMediaPluginLoader, rendererLoader,
 
 QVideoSurfaceGstDelegate::QVideoSurfaceGstDelegate(QAbstractVideoSurface *surface)
     : m_surface(surface)
-    , m_renderer(0)
-    , m_activeRenderer(0)
-    , m_surfaceCaps(0)
-    , m_startCaps(0)
-    , m_renderBuffer(0)
-    , m_notified(false)
-    , m_stop(false)
-    , m_flush(false)
 {
     const auto instances = rendererLoader()->instances(QGstVideoRendererPluginKey);
     for (QObject *instance : instances) {
-        QGstVideoRendererInterface* plugin = qobject_cast<QGstVideoRendererInterface*>(instance);
-        if (QGstVideoRenderer *renderer = plugin ? plugin->createRenderer() : 0)
+        auto plugin = qobject_cast<QGstVideoRendererInterface*>(instance);
+        if (QGstVideoRenderer *renderer = plugin ? plugin->createRenderer() : nullptr)
             m_renderers.append(renderer);
     }
 
@@ -145,6 +201,10 @@ QVideoSurfaceGstDelegate::~QVideoSurfaceGstDelegate()
         gst_caps_unref(m_surfaceCaps);
     if (m_startCaps)
         gst_caps_unref(m_startCaps);
+#if QT_CONFIG(gstreamer_gl)
+    if (m_gstGLDisplayContext)
+        gst_object_unref(m_gstGLDisplayContext);
+#endif
 }
 
 GstCaps *QVideoSurfaceGstDelegate::caps()
@@ -252,6 +312,118 @@ GstFlowReturn QVideoSurfaceGstDelegate::render(GstBuffer *buffer)
     m_renderBuffer = 0;
 
     return m_renderReturn;
+}
+
+#if QT_CONFIG(gstreamer_gl)
+static GstGLContext *gstGLDisplayContext(QAbstractVideoSurface *surface)
+{
+    auto glContext = qobject_cast<QOpenGLContext*>(surface->property("GLContext").value<QObject*>());
+    // Context is not ready yet.
+    if (!glContext)
+        return nullptr;
+
+    GstGLDisplay *display = nullptr;
+    const QString platform = QGuiApplication::platformName();
+    const char *contextName = "eglcontext";
+    GstGLPlatform glPlatform = GST_GL_PLATFORM_EGL;
+    QPlatformNativeInterface *pni = QGuiApplication::platformNativeInterface();
+
+#if GST_GL_HAVE_WINDOW_X11
+    if (platform == QLatin1String("xcb")) {
+        if (QOpenGLContext::openGLModuleType() == QOpenGLContext::LibGL) {
+            contextName = "glxcontext";
+            glPlatform = GST_GL_PLATFORM_GLX;
+        }
+
+        display = (GstGLDisplay *)gst_gl_display_x11_new_with_display(
+            (Display *)pni->nativeResourceForIntegration("display"));
+    }
+#endif
+
+#if GST_GL_HAVE_PLATFORM_EGL
+    if (!display && platform == QLatin1String("eglfs")) {
+        display = (GstGLDisplay *)gst_gl_display_egl_new_with_egl_display(
+            pni->nativeResourceForIntegration("egldisplay"));
+    }
+#endif
+
+#if GST_CHECK_VERSION(1,11,1)
+#if GST_GL_HAVE_WINDOW_WAYLAND
+    if (!display && platform.startsWith(QLatin1String("wayland"))) {
+        const char *displayName = (platform == QLatin1String("wayland"))
+            ? "display" : "egldisplay";
+
+        display = (GstGLDisplay *)gst_gl_display_wayland_new_with_display(
+            (struct wl_display *)pni->nativeResourceForIntegration(displayName));
+    }
+#endif
+#endif
+
+    if (!display) {
+        qWarning() << "Could not create GstGLDisplay";
+        return nullptr;
+    }
+
+    void *nativeContext = pni->nativeResourceForContext(contextName, glContext);
+    if (!nativeContext)
+        qWarning() << "Could not find resource for" << contextName;
+
+    GstGLContext *appContext = gst_gl_context_new_wrapped(display, (guintptr)nativeContext, glPlatform, GST_GL_API_ANY);
+    if (!appContext)
+        qWarning() << "Could not create wrappped context for platform:" << glPlatform;
+
+    GstGLContext *displayContext = nullptr;
+    GError *error = nullptr;
+    gst_gl_display_create_context(display, appContext, &displayContext, &error);
+    if (error) {
+        qWarning() << "Could not create display context:" << error->message;
+        g_clear_error(&error);
+    }
+
+    if (appContext)
+        gst_object_unref(appContext);
+
+    gst_object_unref(display);
+
+    return displayContext;
+}
+#endif // #if QT_CONFIG(gstreamer_gl)
+
+bool QVideoSurfaceGstDelegate::query(GstQuery *query)
+{
+#if QT_CONFIG(gstreamer_gl)
+    if (GST_QUERY_TYPE(query) == GST_QUERY_CONTEXT) {
+        const gchar *type;
+        gst_query_parse_context_type(query, &type);
+
+        if (strcmp(type, "gst.gl.local_context") != 0)
+            return false;
+
+        if (!m_gstGLDisplayContext)
+            m_gstGLDisplayContext = gstGLDisplayContext(m_surface);
+
+        // No context yet.
+        if (!m_gstGLDisplayContext)
+            return false;
+
+        GstContext *context = nullptr;
+        gst_query_parse_context(query, &context);
+        context = context ? gst_context_copy(context) : gst_context_new(type, FALSE);
+        GstStructure *structure = gst_context_writable_structure(context);
+#if GST_CHECK_VERSION(1,11,1)
+        gst_structure_set(structure, "context", GST_TYPE_GL_CONTEXT, m_gstGLDisplayContext, nullptr);
+#else
+        gst_structure_set(structure, "context", GST_GL_TYPE_CONTEXT, m_gstGLDisplayContext, nullptr);
+#endif
+        gst_query_set_context(query, context);
+        gst_context_unref(context);
+
+        return m_gstGLDisplayContext;
+    }
+#else
+    Q_UNUSED(query);
+#endif
+    return false;
 }
 
 bool QVideoSurfaceGstDelegate::event(QEvent *event)
@@ -424,10 +596,10 @@ GType QGstVideoRendererSink::get_type()
         {
             sizeof(QGstVideoRendererSinkClass),                    // class_size
             base_init,                                         // base_init
-            NULL,                                              // base_finalize
+            nullptr,                                           // base_finalize
             class_init,                                        // class_init
-            NULL,                                              // class_finalize
-            NULL,                                              // class_data
+            nullptr,                                           // class_finalize
+            nullptr,                                           // class_data
             sizeof(QGstVideoRendererSink),                         // instance_size
             0,                                                 // n_preallocs
             instance_init,                                     // instance_init
@@ -460,6 +632,7 @@ void QGstVideoRendererSink::class_init(gpointer g_class, gpointer class_data)
     base_sink_class->propose_allocation = QGstVideoRendererSink::propose_allocation;
     base_sink_class->stop = QGstVideoRendererSink::stop;
     base_sink_class->unlock = QGstVideoRendererSink::unlock;
+    base_sink_class->query = QGstVideoRendererSink::query;
 
     GstElementClass *element_class = reinterpret_cast<GstElementClass *>(g_class);
     element_class->change_state = QGstVideoRendererSink::change_state;
@@ -486,13 +659,35 @@ void QGstVideoRendererSink::base_init(gpointer g_class)
             GST_ELEMENT_CLASS(g_class), gst_static_pad_template_get(&sink_pad_template));
 }
 
+struct NullSurface : QAbstractVideoSurface
+{
+    NullSurface(QObject *parent = nullptr) : QAbstractVideoSurface(parent) { }
+
+    QList<QVideoFrame::PixelFormat> supportedPixelFormats(QAbstractVideoBuffer::HandleType) const override
+    {
+        return QList<QVideoFrame::PixelFormat>() << QVideoFrame::Format_RGB32;
+    }
+
+    bool present(const QVideoFrame &) override
+    {
+        return true;
+    }
+};
+
 void QGstVideoRendererSink::instance_init(GTypeInstance *instance, gpointer g_class)
 {
+    Q_UNUSED(g_class);
     VO_SINK(instance);
 
-    Q_UNUSED(g_class);
+    if (!current_surface) {
+        qWarning() << "Using qtvideosink element without video surface";
+        static NullSurface nullSurface;
+        current_surface = &nullSurface;
+    }
+
     sink->delegate = new QVideoSurfaceGstDelegate(current_surface);
     sink->delegate->moveToThread(current_surface->thread());
+    current_surface = nullptr;
 }
 
 void QGstVideoRendererSink::finalize(GObject *object)
@@ -512,12 +707,12 @@ void QGstVideoRendererSink::handleShowPrerollChange(GObject *o, GParamSpec *p, g
     QGstVideoRendererSink *sink = reinterpret_cast<QGstVideoRendererSink *>(d);
 
     gboolean showPrerollFrame = true; // "show-preroll-frame" property is true by default
-    g_object_get(G_OBJECT(sink), "show-preroll-frame", &showPrerollFrame, NULL);
+    g_object_get(G_OBJECT(sink), "show-preroll-frame", &showPrerollFrame, nullptr);
 
     if (!showPrerollFrame) {
         GstState state = GST_STATE_VOID_PENDING;
         GstClockTime timeout = 10000000; // 10 ms
-        gst_element_get_state(GST_ELEMENT(sink), &state, NULL, timeout);
+        gst_element_get_state(GST_ELEMENT(sink), &state, nullptr, timeout);
         // show-preroll-frame being set to 'false' while in GST_STATE_PAUSED means
         // the QMediaPlayer was stopped from the paused state.
         // We need to flush the current frame.
@@ -532,7 +727,7 @@ GstStateChangeReturn QGstVideoRendererSink::change_state(
     QGstVideoRendererSink *sink = reinterpret_cast<QGstVideoRendererSink *>(element);
 
     gboolean showPrerollFrame = true; // "show-preroll-frame" property is true by default
-    g_object_get(G_OBJECT(element), "show-preroll-frame", &showPrerollFrame, NULL);
+    g_object_get(G_OBJECT(element), "show-preroll-frame", &showPrerollFrame, nullptr);
 
     // If show-preroll-frame is 'false' when transitioning from GST_STATE_PLAYING to
     // GST_STATE_PAUSED, it means the QMediaPlayer was stopped.
@@ -601,6 +796,15 @@ GstFlowReturn QGstVideoRendererSink::show_frame(GstVideoSink *base, GstBuffer *b
 {
     VO_SINK(base);
     return sink->delegate->render(buffer);
+}
+
+gboolean QGstVideoRendererSink::query(GstBaseSink *base, GstQuery *query)
+{
+    VO_SINK(base);
+    if (sink->delegate->query(query))
+        return TRUE;
+
+    return GST_BASE_SINK_CLASS(sink_parent_class)->query(base, query);
 }
 
 QT_END_NAMESPACE

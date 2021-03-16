@@ -50,7 +50,11 @@ QT_BEGIN_NAMESPACE
 QMediaPluginLoader::QMediaPluginLoader(const char *iid, const QString &location, Qt::CaseSensitivity caseSensitivity):
     m_iid(iid)
 {
+#if defined(Q_OS_ANDROID)
+    m_location = QString(location).replace(QLatin1Char('/'), QLatin1Char('_'));
+#else
     m_location = QString::fromLatin1("/%1").arg(location);
+#endif
     m_factoryLoader = new QFactoryLoader(m_iid, m_location, caseSensitivity);
     loadMetadata();
 }
@@ -100,7 +104,7 @@ QList<QObject*> QMediaPluginLoader::instances(QString const &key)
 
     static const bool showDebug = qEnvironmentVariableIntValue("QT_DEBUG_PLUGINS");
     static const QStringList preferredPlugins =
-        qEnvironmentVariable("QT_MULTIMEDIA_PREFERRED_PLUGINS").split(QLatin1Char(','), QString::SkipEmptyParts);
+        qEnvironmentVariable("QT_MULTIMEDIA_PREFERRED_PLUGINS").split(QLatin1Char(','), Qt::SkipEmptyParts);
     for (int i = preferredPlugins.size() - 1; i >= 0; --i) {
         auto name = preferredPlugins[i];
         bool found = false;

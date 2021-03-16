@@ -21,4 +21,6 @@ SOURCES += \
     qsound.cpp
 
 OTHER_FILES += \
-    soundeffect.qml
+    soundeffect.qml \
+    qtvideosink.qml \
+    multiple-videooutputs.qml

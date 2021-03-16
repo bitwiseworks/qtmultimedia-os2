@@ -43,6 +43,7 @@ QT_BEGIN_NAMESPACE
 
 /*!
     \class QVideoDeviceSelectorControl
+    \obsolete
 
     \brief The QVideoDeviceSelectorControl class provides an video device selector media control.
     \inmodule QtMultimedia
@@ -137,6 +138,6 @@ QVideoDeviceSelectorControl::~QVideoDeviceSelectorControl()
     Signals that the selected video device \a name has changed.
 */
 
-#include "moc_qvideodeviceselectorcontrol.cpp"
 QT_END_NAMESPACE
 
+#include "moc_qvideodeviceselectorcontrol.cpp"
