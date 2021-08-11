@@ -11,6 +11,7 @@ PLUGIN_TYPE = mediaservice
 PLUGIN_CLASS_NAME = MockServicePlugin4
 load(qt_plugin)
 
+CONFIG -= create_cmake
 DESTDIR = ../$${PLUGIN_TYPE}
 win32|os2:debug_and_release {
     CONFIG(debug, debug|release) {
